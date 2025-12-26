@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<head>
+  <meta charset="UTF-8">
+  <title>TopoCycle UI</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="tc_client.css">
+</head>
+
+
+<body>
+  <div id="instructions">
+    <p>Instructions and messages appear here.</p>
+  </div>
+
+  <div id="main">
+    <div id="map"></div>
+
+    <div id="extra-controls">
+      <p>Extra options...</p>
+    </div>
+
+    <div id="controls">
+      
+      <!-- User section -->
+      <div class="control-section" id="user-section">
+        <h3>User</h3>
+        <button>Login</button>
+        <button>Register</button>
+        <button>Logout</button>
+        <p id="userStatus">Not logged in</p>
+      </div>
+
+      <!-- Map layers section -->
+      <div class="control-section" id="layers-section">
+        <h3>Map Layers</h3>
+        <label><input type="checkbox" id="layerRoads"> Roads</label><br>
+        <label><input type="checkbox" id="layerCycle"> Cycle Paths</label><br>
+        <label><input type="checkbox" id="layerTerrain"> Terrain</label>
+      </div>
+
+      <!-- Main actions section -->
+      <div class="control-section" id="actions-section">
+        <h3>Actions</h3>
+        <div class="action-grid">
+          <button id="toggleExtra">Toggle Extra Controls</button>
+          <button id="showPopup">Show Popup</button>
+          <button>BUTTON 3</button>
+          <button>BUTTON 4</button>
+        </div>
+      </div>
+
+      <!-- Info section -->
+      <div class="control-section" id="info-section">
+        <h3>Info</h3>
+        <p>Info content goes here...</p>
+        <!-- Later you can subdivide this further -->
+      </div>
+
+    </div>
+
+    <div id="popup">
+      <p>This is a popup dialog.</p>
+      <button id="closePopup">Close</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script type="module" src="tc_client.js"></script>
+
+</body>
+</html>

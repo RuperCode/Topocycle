@@ -1,0 +1,103 @@
+
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #instructions {
+      background: #f0f0f0;
+      padding: 0.5em;
+      border-bottom: 1px solid #ccc;
+    }
+
+    #main {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+
+    #map {
+      flex: 1;
+    }
+
+    #controls {
+      width: 300px; /* about 3" on a laptop */
+      background: #eaeaea;
+      padding: 1em;
+      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 1em; /* space between sections */
+    }
+
+    .control-section {
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 0.5em;
+    }
+
+    .control-section h3 {
+      margin-top: 0;
+      font-size: 1em;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5em;
+    }
+
+
+    #extra-controls {
+      width: 200px;
+      background: #ddd;
+      padding: 1em;
+      display: none;
+    }
+
+    #popup {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border: 1px solid #333;
+      padding: 1em;
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+.user-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 1em;
+}
+
+.user-left {
+  text-align: center;
+  min-width: 60px;
+}
+
+.user-icon {
+  font-size: 2em;
+}
+
+.user-icon.red {
+  color: red;
+}
+
+.user-icon.green {
+  color: green;
+}
+
+.user-icon.amber {
+  color: orange; /* amber tone */
+}
+
+.user-right {
+  flex: 1;
+}
+

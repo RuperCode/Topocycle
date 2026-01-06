@@ -1,29 +1,74 @@
 // Import classes
+import { Lock } from './tc_tools.js';
+import { Interlocking } from './tc_tools.js';
 import { Authenticator } from './tc_auth.js';
+import { MessageBarUIC } from './tc_UI.js';
+import { UserAccountUIC } from './tc_UI.js';
+import { LayersSelectionUIC } from 'tc_UI.js';
+import { ModeSelectionUIC } from 'tc_UI.js';
+import { InfoSectionUIC } from 'tc_UI.js';
+import { ExtraControlsUIC } from './tc_UI.js';
+import { DialogueBoxUIC } from './tc_UI.js';
 
 
-// Key instantiations
-const map = L.map('map').setView([51.4, -0.35], 13); //creates a new Leaflet map and sets the view zoomed on a fixed location (can make that dynamic in future)
-const user = new Authenticator(); //Authentication module
+// Get hold of key elements in the HTML
+const messageBarHTML = document.getElementById('message-bar');
+const userAccountHTML = document.getElementById("user-account");
+const layersSelectionHTML = document.getElementById("layers-selection");
+const modeSelectionHTML = document.getElementById('mode-selection');
+const infoSectionHTML = document.getElementById("info-section");
+const extraControlsHTML = document.getElementById('extra-controls');
+const dialogueBoxHTML = document.getElementById('dialogue-box');
 
-// Get crucial html elements
-const extraControls = document.getElementById('extra-controls');
-const popup = document.getElementById('popup');
+
+
+// Create a new Leaflet map and set the view zoomed on a fixed location (can make that dynamic in future)
+const map = L.map('map').setView([51.4, -0.35], 13);
+
+// User authentication handler
+const auth = new Authenticator(); 
+
+// Set up interlocking system and locks 
+const interlocking =  new Interlocking();
+userAccountLock = interlocking.newLock();
+modeSelectionLock = interlocking.newLock();
+infoSectionLock = interlocking.newLock();
+extraControlsLock = interlocking.newLock();
+dialogBoxLock = interlocking.newLock();
+
+
+
+// Instatiate handlers for UI components
+const messageBarUIC = new MessageBarUIC(messageBarHTML);
+const userAccountUIC = new UserAccountUIC(userAccountHTML, userAcccountLock, auth);
+const layersSelection UIC = new LayersSelectionUIC(layersSelectionHTML);
+const modeSelectionUIC = new ModeSelectionUIC(modeSelectionHTML, modeSelectionLock);
+const infoSectionUIC = new InfoSectionUIC(infoSectionHTML, infoSectionLock);
+const extraControlsUIC = new ExtraControlsUIC(extraControlsHTML, extraControlsLock);
+const dialogueBoxUIC = new DialogueBoxUIC(dialogueBoxHTML, dialogueBoxLock);
+
+
+
+
+// Get html elements for legacy example UI functionality - to be replaced
 const toggleExtraButton = document.getElementById('toggleExtra');
 const showPopupButton = document.getElementById('showPopup');
 const closePopupButton = document.getElementById('closePopup');
+  
 
-// Initialize Leaflet map
+
+// Initialise Leaflet map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
+/* LEGACY User management section
+
 // Initialise user login state 
-let userState = "loggedOut"; // "loggedOut", "registering", "loggedIn"
+let userState = "loggedOut";
 let currentUserName = null;
 
 
-// User management section
 function renderUserSection() {
   const section = document.getElementById("user-section");
   section.innerHTML = ""; // clear existing content
@@ -50,7 +95,7 @@ function renderUserSection() {
         const identifier = document.getElementById("identifier").value;
         const password = document.getElementById("password").value;
 
-        const currentUser = await user.login(identifier, password);
+        const currentUser = await auth.login(identifier, password);
 
         currentUserName = currentUser.username; 
         userState = "loggedIn";
@@ -104,7 +149,7 @@ function renderUserSection() {
       }
 
       try {
-        const currentUser = await user.register(username, email, password);
+        const currentUser = await auth.register(username, email, password);
 
         currentUserName = currentUser.username; 
         userState = "loggedIn";
@@ -138,7 +183,7 @@ function renderUserSection() {
     `;
     document.getElementById("logoutBtn").onclick = async function() {
       try {
-        await user.logout();
+        await auth.logout();
 
         currentUserName = null; 
         userState = "loggedOut";
@@ -152,13 +197,40 @@ function renderUserSection() {
     };
   }
 }
+*/
 
-// Call once at startup
 
+// EVENT LISTENERS FOR TEMPORARY CONTROLS - TO BE DELETED
+showPopupButton.onclick = function() {   
+  dialogueBoxUIC.setState("notifying", "message: dialogueBoxUIC up and running");
+};
+
+toggleExtraButton.onclick = function() {
+  if (extraControlsHTML.style.display === 'none' || extraControlsHTML.style.display === '') {
+    extraControlsHTML.style.display = 'block';
+  } else {
+    extraControlsHTML.style.display = 'none';
+  }
+};
+
+
+// Set a startup function to set initial UIC states, including whether userAccount already logged in
+//!! Does this need to be asunc here or an await? Is this correctly bound?)
+async function startup(){
+
+  messageBarUIC.setState("test-message") 
+  userAccountUIC.checkState()
+
+}
+
+window.addEventListener('load', startup());
+
+
+/* LEGACY TO BE DELETED
 window.addEventListener('load', async function () {
   try {
-    const currentUser = await user.check();
-
+    const currentUser = await auth.check();
+  
     if (!currentUser) {
       currentUserName = null;
       userState = "loggedOut";
@@ -178,25 +250,10 @@ window.addEventListener('load', async function () {
   }
 
 });
+*/
 
 
 
 
-// Toggle extra controls
-toggleExtraButton.onclick = function() {
-  if (extraControls.style.display === 'none' || extraControls.style.display === '') {
-    extraControls.style.display = 'block';
-  } else {
-    extraControls.style.display = 'none';
-  }
-};
 
-// Show popup
-showPopupButton.onclick = function() {
-  popup.style.display = 'block';
-};
 
-// Close popup
-closePopupButton.onclick = function() {
-  popup.style.display = 'none';
-};

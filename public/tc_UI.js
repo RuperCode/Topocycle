@@ -335,30 +335,7 @@ class MessageBarUIC extends StatefulElement {
 
 class ExtraControlsUIC extends StatefulElement {
 
-  constructor(element) {
-
-    super(element);
-
-    // Define the fixed HTML states for this UIC
-    this.defineState("test-state",`
-      <p>Extra Controls UIC up and running</p>
-    `); 
-
-    // No core functionality of this UIC as class field functions because this all handled by a parent UIC
-
-  }
-
-  // setState() method override only adds a call to show() as event handling for the defined states of this UIC to be handled by a parent UIC
-  
-  
-  setState(state, params) {
-  
-    super(state,params);
-  
-    this.open();
-  
-  }
-  
+  // extended only for open/close functionality
   
   clear() {
     
@@ -368,10 +345,12 @@ class ExtraControlsUIC extends StatefulElement {
   }
   
   open() {
+    //!! NEED TO ADD ANIMATION 
     this.element.style.display = 'block';
   }
   
   close() {
+    //!! NEED TO ADD ANIMATION 
     this.element.style.display = 'none';
   }
 
@@ -379,5 +358,107 @@ class ExtraControlsUIC extends StatefulElement {
 
 
 
+//-----------------------------------------------------------------------
+
+
+
+class ModeSelectionUIC extends StatefulElement {
+
+  constructor(element, dialogueBox, extraControls, lock){
+
+    super(element);
+    
+    this.dialogueBox = dialogueBox;
+    this.extraControls = extraControls;
+    this.lock = lock;
+
+    // Define the fixed HTML states for this UIC
+    this.defineState("testing",`
+      <p>ModeSelectorUIC up and running</p>
+      <button id="openExtraControlsBtn">Open Extra Controls</button>
+      <button id="showDialogueBoxBtn">Show Dialogue Box</button>
+    `);
+
+    this.extraControls.defineState("testing-from-modeSelector",`
+      <p>ExtraControlsUIC up and running</p>
+      <button id="closeExtraControlsBtn">Close</button>
+    `);
+
+    this.defineState("segment-selecting",`
+      <button id="addLinkBtn">Add Link</button>
+    `);
+
+    // DEFINE OTHER REQUIRED STATES HERE
+
+    // INITIATE IN DEFAULT STATE
+    this.setState("segment-selecting");
+
+    // Define core functionality of this UIC in class field functions 
+
+    this.testShowDialogue = function () {
+      this.dialogueBox.setState("notifying", {message: "DialogueBoxUIC up and running"});
+    }
+
+    this.testOpenExtra = async function () {
+      if(this.extraControls.getState() === "testing-from-modeSelector"){
+        this.extraControls.open();
+      } else {
+        try {
+          await this.extraControls.clear();
+          this.extraControls.setState("testing-from-modeSelector");
+          this.extraControls.element.getElementById("closeExtraControlsBtn").onclick = this.testCloseExtra;
+        } catch {
+          //!! HANDLE A THROW EG IF STATE IS LOCKED
+        }
+      }
+    };
+
+    this.testCloseExtra = function () {
+      this.extraControls.close();
+    };
+    
+
+    this.initiateAddLink = function () {
+      //!! TO SET NEW STATE HERE AND IN MAP MANAGER
+    };
+
+
+  }
+
+  setState(state, params) {
+  
+    // Create event handling for the defined states of this UIC in addition to setting the HTML state in the super class
+    switch (state) {
+
+//!! NEED TO MOVE THE SUPER CALL OUTSIDE THE CASE?
+      case "testing":
+      //!! UPDATE THE BELOW
+        super.setState(state, params);
+        this.element.getElementById("showDialogueBoxBtn").onclick = this.testShowDialogue;
+        this.element.getElementById("openExtraControlsBtn").onclick = this.testOpenExtra;
+      break;
+
+      case "segment-selecting":
+      //!! UODATE THE BELOW
+        super.setState(state, params);
+        this.element.getElementById("addLinkBtn").onclick = this.initiateAddLink;
+      break;
+
+      default:
+        super.setState(state);
+
+    }
+
+  }
+  
+  
+  clear() {
+    // Overridden to effect a default state
+    this.setState("segment-selecting");
+
+  }
+  
+  
+}
 
 

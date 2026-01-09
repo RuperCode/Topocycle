@@ -4,9 +4,9 @@ import { Interlocking } from './tc_tools.js';
 import { Authenticator } from './tc_auth.js';
 import { MessageBarUIC } from './tc_UI.js';
 import { UserAccountUIC } from './tc_UI.js';
-import { LayersSelectionUIC } from 'tc_UI.js';
+//import { LayersSelectionUIC } from 'tc_UI.js';
 import { ModeSelectionUIC } from 'tc_UI.js';
-import { InfoSectionUIC } from 'tc_UI.js';
+//import { InfoSectionUIC } from 'tc_UI.js';
 import { ExtraControlsUIC } from './tc_UI.js';
 import { DialogueBoxUIC } from './tc_UI.js';
 
@@ -40,7 +40,7 @@ dialogBoxLock = interlocking.newLock();
 
 // Instatiate handlers for UI components
 const messageBarUIC = new MessageBarUIC(messageBarHTML);
-const userAccountUIC = new UserAccountUIC(userAccountHTML, userAcccountLock, auth);
+const userAccountUIC = new UserAccountUIC(userAccountHTML, messageBarUIC, dialogueBoxUIC, extraControlsUIC, userAcccountLock, auth);
 const layersSelection UIC = new LayersSelectionUIC(layersSelectionHTML);
 const modeSelectionUIC = new ModeSelectionUIC(modeSelectionHTML, modeSelectionLock);
 const infoSectionUIC = new InfoSectionUIC(infoSectionHTML, infoSectionLock);
@@ -51,9 +51,9 @@ const dialogueBoxUIC = new DialogueBoxUIC(dialogueBoxHTML, dialogueBoxLock);
 
 
 // Get html elements for legacy example UI functionality - to be replaced
-const toggleExtraButton = document.getElementById('toggleExtra');
-const showPopupButton = document.getElementById('showPopup');
-const closePopupButton = document.getElementById('closePopup');
+//const toggleExtraButton = document.getElementById('toggleExtra');
+//const showPopupButton = document.getElementById('showPopup');
+//const closePopupButton = document.getElementById('closePopup');
   
 
 
@@ -201,25 +201,26 @@ function renderUserSection() {
 
 
 // EVENT LISTENERS FOR TEMPORARY CONTROLS - TO BE DELETED
-showPopupButton.onclick = function() {   
-  dialogueBoxUIC.setState("notifying", "message: dialogueBoxUIC up and running");
-};
+/*showPopupButton.onclick = function() {   
+  dialogueBoxUIC.setState("notifying", {message: "dialogueBoxUIC up and running"});
+};*/
 
-toggleExtraButton.onclick = function() {
+/*toggleExtraButton.onclick = function() {
   if (extraControlsHTML.style.display === 'none' || extraControlsHTML.style.display === '') {
     extraControlsHTML.style.display = 'block';
   } else {
     extraControlsHTML.style.display = 'none';
   }
-};
+};*/
 
 
 // Set a startup function to set initial UIC states, including whether userAccount already logged in
 //!! Does this need to be asunc here or an await? Is this correctly bound?)
 async function startup(){
 
-  messageBarUIC.setState("test-message") 
-  userAccountUIC.checkState()
+  messageBarUIC.setState("test-message");
+  modeSelectorUIC.setState("testing");
+  userAccountUIC.checkState();
 
 }
 

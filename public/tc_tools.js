@@ -13,6 +13,9 @@ export class StatefulElement{
   }
 
   defineState(name, template) {
+    if (this.states.hasOwnProperty(name)) {
+      throw new Error(`State "${name}" already defined. Drop it first before redefining.`);
+    }
     this.states[name] = template;
   }
 
@@ -26,18 +29,56 @@ export class StatefulElement{
 
   setState(name, params = {}) {
     if (!this.states.hasOwnProperty(name)) {
-      throw new Error(`State "${name}" not defined`);
+      throw new Error('State "' + name + '" not defined');
     }
 
-    let output = this.states[name];
+    var template = this.states[name];
 
-    // Replace $param markers
-    output = output.replace(/\$(\w+)/g, (match, key) => {
-      return params.hasOwnProperty(key) ? params[key] : match;
+    // Extract required parameter names
+    var regex = /\$(\w+)/g;  // This regex finds all occurrences of $word
+    var match;
+    var requiredParams = [];
+
+    while ((match = regex.exec(template)) !== null) {
+      requiredParams.push(match[1]);  // match[1] is the word after the $
+    }
+
+    // Check for missing parameters
+    for (var i = 0; i < requiredParams.length; i++) {
+      var p = requiredParams[i];
+      if (!params || !params.hasOwnProperty(p)) {
+        throw new Error(
+          'Missing parameter "' + p + '" for state "' + name + '".'
+        );
+      }
+    }
+
+    // Check for unexpected parameters
+    if (params) {
+      for (var key in params) {
+        if (requiredParams.indexOf(key) === -1) {
+          throw new Error(
+            'Unexpected parameter "' + key + '" for state "' + name + '".'
+          );
+        }
+      }
+    }
+
+    // Replace placeholders
+    var output = template.replace(/\$(\w+)/g, function(fullMatch, key) {
+      return params[key];
     });
 
-    this.element.innerHTML = output; // always interpret as HTML
+    // Render and call hook
+    this.element.innerHTML = output;
     this.currentState = name;
+
+    this.afterRender(name);
+  }
+
+
+  hasState(name) {
+    return this.states.hasOwnProperty(name);
   }
 
   getState() {
@@ -48,7 +89,11 @@ export class StatefulElement{
     this.element.innerHTML = ""; 
     this.currentState = null;
   }
-  
+
+  afterRender(state){
+    //FOR SUBCLASSSES TO OVERRIDE
+  }
+
 }
 
 
@@ -174,5 +219,49 @@ export class Interlocking {
     }
 
     this.interlocks.delete(name);
+  }
+}
+
+
+
+//------------------------------------
+
+
+
+export class AsyncGate {
+
+  // True private fields (enforced by the language)
+  #busy;
+  #queue;
+
+  constructor() {
+    this.#busy = false;
+    this.#queue = [];
+  }
+
+  acquire() {
+    var self = this;
+
+    return new Promise(function (resolve) {
+      if (!self.#busy) {
+        // Gate is free — take it immediately
+        self.#busy = true;
+        resolve();
+      } else {
+        // Gate is busy — queue the resolver
+        self.#queue.push(resolve);
+      }
+    });
+  }
+
+  release() {
+    if (this.#queue.length > 0) {
+      // Pass gate to next waiter
+      var nextResolve = this.#queue.shift();
+      nextResolve();
+    } else {
+      // No waiters — gate becomes free
+      this.#busy = false;
+    }
   }
 }

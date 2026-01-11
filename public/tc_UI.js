@@ -1,15 +1,96 @@
-import { StatefulElement } from './tc_tools.js';
-import { Lock } from './tc_tools.js';
+import { StatefulElement, AsyncGate } from './tc_tools.js';
 import { wait } from './tc_tools.js';
 
 
-class UserAccountUIC extends StatefulElement {
+export class UserAccountUIC extends StatefulElement {
+
+// Define event handlers in class field functions before constructor so we can bind(this) in this constructor
+
+    login = async function() {
+
+      const identifier = this.element.querySelector("#identifier").value;
+      const password = this.element.querySelector("#password").value;
+
+      try {
+        const currentUser = await this.account.login(identifier, password);
+
+        this.setState("loggedIn", {currentUserName: currentUser.username});
+    
+      } catch (err) {
+        //Failed login
+        //!! NEED TO SHOW ERROR HERE
+        this.setState("loggedOut");
+      }
+
+    };
+
+    register = function() {
+      this.setState("registering");
+    };
+
+    submitRegistration = async function() {
+      const username = this.element.querySelector("#regUsername").value;
+      const email = this.element.querySelector("#regEmail").value;
+      const password = this.element.querySelector("#regPassword").value;
+      const confirm = this.element.querySelector("#regConfirm").value;
+
+      if (password !== confirm) {
+        this.element.querySelector("#regMessage").textContent = "Passwords do not match.";
+        return;
+      }
+      if (username.trim() === "") {
+        this.element.querySelector("#regMessage").textContent = "Username is required.";
+        return;
+      }
+
+      try {
+        const currentUser = await this.account.register(username, email, password);
+
+        this.setState("loggedIn", {currentUserName: currentUser.username});
+        
+      } catch (err) {
+        //Failed registration
+        //NEED TO SHOW ERROR HERE
+        this.setState("loggedOut");
+      }
+
+    };
+    
+    cancelRegistration = function() {
+      this.setState("loggedOut");
+    };
+
+    logout = async function() {
+    
+      //!! ADD AN 'ARE YOU SURE' CYCLE
+      try {
+        await this.account.logout();
+        
+        this.setState("loggedOut");
+
+      } catch (err) {
+        //Failed logout
+        //!! NEED TO CONSIDER DIFFERENT REASONS AND BEHAVIOURS   
+   
+      }  
+      
+    };
+
 
   constructor(element, account) {
 
     super(element);
 
     this.account = account;
+
+ // Bind(this) for the event handlers so that they can be used as such a know about 'this'
+
+    this.login = this.login.bind(this);
+    this.register = this.register.bind(this);
+    this.submitRegistration = this.submitRegistration.bind(this);
+    this.cancelRegistration = this.cancelRegistration.bind(this);
+    this.logout = this.logout.bind(this);
+
 
     // Define the fixed HTML states for this UIC
     this.defineState("loggedOut",`
@@ -33,7 +114,7 @@ class UserAccountUIC extends StatefulElement {
       <div class="user-box">
         <div class="user-left">
           <div class="user-icon green"><i class="fas fa-user"></i></div>
-          <p>${currentUserName}</p>
+          <p>$currentUserName</p>
         </div>
         <div class="user-right">
           <button id="logoutBtn">Logout</button>
@@ -62,106 +143,29 @@ class UserAccountUIC extends StatefulElement {
 
 
 
-    // Define core functionality of this UIC in class field functions 
-
-    this.login = async function () {
-
-      const identifier = this.element.getElementById("identifier").value;
-      const password = this.element.getElementById("password").value;
-
-      try {
-        const currentUser = await this.account.login(identifier, password);
-
-        this.setState("loggedIn", {currentUserName: currentUser.username});
-    
-      } catch (err) {
-        //Failed login
-        //!! NEED TO SHOW ERROR HERE
-        this.setState("loggedOut");
-      }
-
-    };
-
-    this.register = async function () {
-      this.setState("registering");
-    };
-
-    this.submitRegistration = async function () {
-      const username = this.element.getElementById("regUsername").value;
-      const email = this.element.getElementById("regEmail").value;
-      const password = this.element.getElementById("regPassword").value;
-      const confirm = this.element.getElementById("regConfirm").value;
-
-      if (password !== confirm) {
-        this.element.getElementById("regMessage").textContent = "Passwords do not match.";
-        return;
-      }
-      if (username.trim() === "") {
-        this.element.getElementById("regMessage").textContent = "Username is required.";
-        return;
-      }
-
-      try {
-        const currentUser = await this.account.register(username, email, password);
-
-        this.setState("loggedIn", {currentUserName: currentUser.username});
-        
-      } catch (err) {
-        //Failed registration
-        //NEED TO SHOW ERROR HERE
-        this.setState("loggedOut");
-      }
-
-    };
-    
-    this.cancelRegistration = async function () {
-      this.setState("loggedOut");
-    };
-
-    this.logout = async function () {
-    
-      //!! ADD AN 'ARE YOU SURE' CYCLE
-      try {
-        await this.account.logout();
-        
-        this.setState("loggedOut");
-
-      } catch (err) {
-        //Failed logout
-        //!! NEED TO CONSIDER DIFFERENT REASONS AND BEHAVIOURS   
-   
-      }  
-      
-    };
-
   }
 
-  setState(state) {
+  afterRender(state) {
   
     // Create event handling for the defined states of this UIC in addition to setting the HTML state in the super class
     switch (state) {
+
       case "loggedOut":
-        super.setState(state);
-        //!! CHECK IF this.element WORKS
-        this.element.getElementById("loginBtn").onclick = this.login;
-        this.element.getElementById("registerLink").onclick = this.register;
+        this.element.querySelector("#loginBtn").onclick = this.login;
+        this.element.querySelector("#registerLink").onclick = this.register;
       break;
 
       case "loggedIn":
-        super.setState(state, params);
-        this.element.getElementById("logoutBtn").onclick = this.logout;
+        this.element.querySelector("#logoutBtn").onclick = this.logout;
       break;
 
       case "registering":
-        super.setState(state);
-        this.element.getElementById("registerBtn").onclick = this.submitRegistration;
-        this.element.getElementById("cancelBtn").onclick = this.cancelRegistration;
-        
-        
+        this.element.querySelector("#registerBtn").onclick = this.submitRegistration;
+        this.element.querySelector("#cancelBtn").onclick = this.cancelRegistration;
       break;
 
       default:
-        super.setState(state);
+        //  No default handlers to be set
 
     }
 
@@ -197,7 +201,36 @@ class UserAccountUIC extends StatefulElement {
 
 
 
-class DialogueBoxUIC extends StatefulElement {
+export class DialogueBoxUIC extends StatefulElement {
+
+// Define event handlers in class field functions before constructor so we can bind(this) in this constructor
+
+  dismiss = function () {
+    this.clear();
+  };
+
+  confirm = function () {
+    try {
+      //!! DO A THING
+      if ( this.lock.unlock() ) {
+        this.clear();
+      } else {
+        //!! Deal with failed unlock
+      }
+    } catch (err) {
+      //!! CHECK HOW STATEFULENTITY RECEIVES PARAMETERS
+      this.lock.unlock();
+    }
+  };
+  
+  
+  cancel = function () {
+    //!! DO A THING
+    //!! SHOULD THE SHOW/HIDE BE STATE LINKED?
+    this.lock.unlock();
+    this.clear();
+  };
+
 
   constructor(element, lock) {
 
@@ -205,69 +238,44 @@ class DialogueBoxUIC extends StatefulElement {
     
     this.lock = lock; 
 
+    // Bind(this) for the event handlers so that they can be used as such a know about 'this'
+    this.dismiss = this.dismiss.bind(this);
+    this.confirm = this.confirm.bind(this);
+    this.cancel = this.cancel.bind(this);
+
     // Define the fixed HTML states for this UIC
     this.defineState("notifying",`
-      <p>${message}</p>
+      <p>$message</p>
       <button id="dismissPopupBtn">Dismiss</button>
     `);
 
     this.defineState("confirming",`
-      <p>${confirmation}</p>
+      <p>$confirmation</p>
       <button id="confirmPopupBtn">Confirm</button>
       <button id="cancelPopupBtn">Cancel</button>
     `);
 
-    // Define core functionality of thus UIC in class field functions 
-
-    this.dismiss = function () {
-        this.clear();
-    };
-
-    this.confirm = async function () {
-      try {
-        //!! DO A THING
-        if ( this.lock.unlock() ) {
-          this.clear();
-        } else {
-          //!! Deal with failed unlock
-        }
-      } catch (err) {
-        //!! CHECK HOW STATEFULENTITY RECEIVES PARAMETERS
-        this.unlock();
-on 
-      }
-    };
-    
-    
-    this.cancel = async function () {
-      //!! DO A THING
-      //!! SHOULD THE SHOW/HIDE BE STATE LINKED?
-      this.unlock();
-      this.clear();
-    };
 
   }
 
-  setState(state, params) {
+  afterRender(state) {
   
-    // Create event handling for the defined states of this UIC in addition to setting the HTML state in the super class
+    // Create event handling for the defined states of this UIC
     switch (state) {
 
       case "notifying":
-        super.setState(state, params);
-        this.element.getElementById("dismissPopupBtn").onclick = this.dismiss;
+        this.element.querySelector("#dismissPopupBtn").onclick = this.dismiss;
         this.show();
       break;
 
       case "confirming":
-        super.setState(state, params);
-        this.element.getElementById("confirmPopupBtn").onclick = this.confirm;
-        this.element.getElementById("cancelPopupBtn").onclick = this.cancel;
+        this.element.querySelector("#confirmPopupBtn").onclick = this.confirm;
+        this.element.querySelector("#cancelPopupBtn").onclick = this.cancel;
         this.show();
-      break;o
+      break;
 
       default:
-        super.setState(state);
+        // No default handlers to be set
 
     }
 
@@ -275,7 +283,7 @@ on
   
   
   clear() {
-    this.hide;
+    this.hide();
     super.clear();
 
   }
@@ -294,33 +302,47 @@ on
 
 
 
-
-
-
-
 //------------------------------------------------
 
 
 
 
-class MessageBarUIC extends StatefulElement {
+export class MessageBarUIC extends StatefulElement {
 
   constructor(element) {
     super(element);
+
+    this.revertState = null;
+    this.flashCounter = 0;
 
     this.defineState("test-message", "<p>Message Bar UIC up and running</p>");
 
   }
 
-  async flashState(state, duration = 6000) {
-  
-        const lastState = this.currentState;
-        this.setState(state);
 
-        await wait(duration); 
+ async flashState(state, duration = 6000) {
 
-        this.setState(lastState);
+    // Only the first flash in a burst sets the revert state
+    if (this.revertState === null) {
+      this.revertState = this.currentState;
     }
+
+    // Each flash gets a unique ID
+    const myFlashId = ++this.flashCounter;
+
+    // Apply the temporary state
+    this.setState(state);
+
+    // Wait
+    await wait(duration);
+
+    // Only the latest flash is allowed to revert
+    if (myFlashId === this.flashCounter) {
+      this.setState(this.revertState);
+      this.revertState = null;
+    }
+  }
+
 }
 
 
@@ -331,30 +353,103 @@ class MessageBarUIC extends StatefulElement {
 
 
 
+export class ExtraControlsUIC extends StatefulElement {
 
+  constructor(element) {
+    super(element);
 
-class ExtraControlsUIC extends StatefulElement {
+    // Prevent logical re-entry (open while opening, close while closing)
+    this.isAnimating = false;
 
-  // extended only for open/close functionality
-  
-  clear() {
-    
-    this.close;
+    // Async gate to prevent concurrent animations from different call paths
+    this.animationGate = new AsyncGate();
+
+    // Drawer width (matches CSS)
+    this.drawerWidth = 200;
+
+    element.style.right = `-${this.drawerWidth}px`;
+    element.style.position = 'absolute';
+    element.style.top = '0';
+
+  }
+
+  async clear() {
+    await this.close();
     super.clear();
-
-  }
-  
-  open() {
-    //!! NEED TO ADD ANIMATION 
-    this.element.style.display = 'block';
-  }
-  
-  close() {
-    //!! NEED TO ADD ANIMATION 
-    this.element.style.display = 'none';
   }
 
-} 
+  async open() {
+    // Logical guard
+    if (this.isAnimating) return;
+    this.isAnimating = true;
+
+    // Concurrency guard
+    await this.animationGate.acquire();
+
+    try {
+      const el = this.element;
+
+      // Prepare element
+      el.style.display = 'block';
+      el.style.width = `${this.drawerWidth}px`;
+      el.style.overflow = 'hidden';
+
+      void el.offsetWidth;
+
+      const step = 10;
+      const delay = 10;
+
+      for (let x = -this.drawerWidth; x <= 0; x += step) {
+        el.style.right = `${x}px`;
+        await wait(delay);
+      }
+
+      // Ensure exact final position
+      el.style.right = '0px';
+      el.style.overflow = '';
+
+    } finally {
+      this.isAnimating = false;
+      this.animationGate.release();
+    }
+  }
+
+  async close() {
+    // Logical guard
+    if (this.isAnimating) return;
+    this.isAnimating = true;
+
+    // Concurrency guard
+    await this.animationGate.acquire();
+
+    try {
+      const el = this.element;
+
+      el.style.overflow = 'hidden';
+
+      // Determine starting position
+      let currentRight = parseInt(el.style.right, 10);
+
+
+      const step = 10;
+      const delay = 10;
+
+      for (let x = currentRight; x >= -this.drawerWidth; x -= step) {
+        el.style.right = `${x}px`;
+        await wait(delay);
+      }
+
+      // Final state
+      el.style.right = `-${this.drawerWidth}px`;
+      el.style.display = 'none';
+      el.style.overflow = '';
+
+    } finally {
+      this.isAnimating = false;
+      this.animationGate.release();
+    }
+  }
+}
 
 
 
@@ -362,15 +457,54 @@ class ExtraControlsUIC extends StatefulElement {
 
 
 
-class ModeSelectionUIC extends StatefulElement {
+export class ModeSelectionUIC extends StatefulElement {
 
-  constructor(element, dialogueBox, extraControls, lock){
+
+// Define event handlers in class field functions before constructor so we can bind(this) in this constructor
+  testShowDialogue = function () {
+    this.dialogueBox.setState("notifying", {message: "DialogueBoxUIC up and running"});
+  }
+
+  testOpenExtra = async function () {
+    if(this.extraControls.getState() === "testing-from-modeSelector"){
+      this.extraControls.open();
+    } else {
+      try {
+        await this.extraControls.clear();
+        this.extraControls.setState("testing-from-modeSelector");
+        this.extraControls.element.querySelector("#closeExtraControlsBtn").onclick = this.testCloseExtra;
+      } catch {
+        //!! HANDLE A THROW EG IF STATE IS LOCKED
+      }
+    }
+  };
+
+  testCloseExtra = function () {
+    this.extraControls.close();
+  };
+  
+
+  initiateAddLink = function () {
+    //!! TO SET NEW STATE HERE AND IN MAP MANAGER
+  };
+
+
+
+
+  constructor(element, messageBar, dialogueBox, extraControls, lock){
 
     super(element);
     
+    this.messageBar = messageBar;
     this.dialogueBox = dialogueBox;
     this.extraControls = extraControls;
     this.lock = lock;
+
+    // Bind(this) for the event handlers so that they can be used as such a know about 'this'
+    this.testShowDialogue = this.testShowDialogue.bind(this); 
+    this.testOpenExtra = this.testOpenExtra.bind(this); 
+    this.testCloseExtra = this.testCloseExtra.bind(this); 
+    this.initiateAddLink = this.initiateAddLink.bind(this); 
 
     // Define the fixed HTML states for this UIC
     this.defineState("testing",`
@@ -393,59 +527,24 @@ class ModeSelectionUIC extends StatefulElement {
     // INITIATE IN DEFAULT STATE
     this.setState("segment-selecting");
 
-    // Define core functionality of this UIC in class field functions 
-
-    this.testShowDialogue = function () {
-      this.dialogueBox.setState("notifying", {message: "DialogueBoxUIC up and running"});
-    }
-
-    this.testOpenExtra = async function () {
-      if(this.extraControls.getState() === "testing-from-modeSelector"){
-        this.extraControls.open();
-      } else {
-        try {
-          await this.extraControls.clear();
-          this.extraControls.setState("testing-from-modeSelector");
-          this.extraControls.element.getElementById("closeExtraControlsBtn").onclick = this.testCloseExtra;
-        } catch {
-          //!! HANDLE A THROW EG IF STATE IS LOCKED
-        }
-      }
-    };
-
-    this.testCloseExtra = function () {
-      this.extraControls.close();
-    };
-    
-
-    this.initiateAddLink = function () {
-      //!! TO SET NEW STATE HERE AND IN MAP MANAGER
-    };
-
-
   }
 
-  setState(state, params) {
+  afterRender(state) {
   
     // Create event handling for the defined states of this UIC in addition to setting the HTML state in the super class
     switch (state) {
 
-//!! NEED TO MOVE THE SUPER CALL OUTSIDE THE CASE?
       case "testing":
-      //!! UPDATE THE BELOW
-        super.setState(state, params);
-        this.element.getElementById("showDialogueBoxBtn").onclick = this.testShowDialogue;
-        this.element.getElementById("openExtraControlsBtn").onclick = this.testOpenExtra;
+        this.element.querySelector("#showDialogueBoxBtn").onclick = this.testShowDialogue;
+        this.element.querySelector("#openExtraControlsBtn").onclick = this.testOpenExtra;
       break;
 
       case "segment-selecting":
-      //!! UODATE THE BELOW
-        super.setState(state, params);
-        this.element.getElementById("addLinkBtn").onclick = this.initiateAddLink;
+        this.element.querySelector("#addLinkBtn").onclick = this.initiateAddLink;
       break;
 
       default:
-        super.setState(state);
+        //  No default handlers to be set
 
     }
 

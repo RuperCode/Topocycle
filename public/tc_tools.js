@@ -265,3 +265,25 @@ export class AsyncGate {
     }
   }
 }
+
+
+
+
+//------------------------------------
+
+
+
+ 
+export function waitForTransition(element) {
+    return new Promise(function (resolve) {
+        function handler() {
+            element.removeEventListener('transitionend', handler);
+            resolve();
+        }
+        element.addEventListener('transitionend', handler);
+    });
+}
+
+
+
+

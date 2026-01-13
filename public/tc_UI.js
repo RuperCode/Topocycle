@@ -1,5 +1,5 @@
 import { StatefulElement, AsyncGate } from './tc_tools.js';
-import { wait } from './tc_tools.js';
+import { wait, waitForTransition} from './tc_tools.js';
 
 
 export class UserAccountUIC extends StatefulElement {
@@ -357,99 +357,59 @@ export class ExtraControlsUIC extends StatefulElement {
 
   constructor(element) {
     super(element);
+    this.actionSequence = new AsyncGate();
+    this.isOpen = false;
+  }
 
-    // Prevent logical re-entry (open while opening, close while closing)
-    this.isAnimating = false;
+  async setState(state, params, afterAfterRender) {
 
-    // Async gate to prevent concurrent animations from different call paths
-    this.animationGate = new AsyncGate();
+    await this.actionSequence.acquire();
 
-    // Drawer width (matches CSS)
-    this.drawerWidth = 200;
+    super.setState(state, params);
 
-    element.style.right = `-${this.drawerWidth}px`;
-    element.style.position = 'absolute';
-    element.style.top = '0';
+    if (afterAfterRender) {
+      afterAfterRender(state);
+    }
 
+    this.actionSequence.release();
   }
 
   async clear() {
-    await this.close();
+
+    await this.actionSequence.acquire();
+
     super.clear();
+
+    this.actionSequence.release();
   }
 
   async open() {
-    // Logical guard
-    if (this.isAnimating) return;
-    this.isAnimating = true;
 
-    // Concurrency guard
-    await this.animationGate.acquire();
+    await this.actionSequence.acquire();
 
-    try {
-      const el = this.element;
-
-      // Prepare element
-      el.style.display = 'block';
-      el.style.width = `${this.drawerWidth}px`;
-      el.style.overflow = 'hidden';
-
-      void el.offsetWidth;
-
-      const step = 10;
-      const delay = 10;
-
-      for (let x = -this.drawerWidth; x <= 0; x += step) {
-        el.style.right = `${x}px`;
-        await wait(delay);
-      }
-
-      // Ensure exact final position
-      el.style.right = '0px';
-      el.style.overflow = '';
-
-    } finally {
-      this.isAnimating = false;
-      this.animationGate.release();
+    if (!this.isOpen) {
+      this.isOpen = true;
+      this.element.classList.add('shown');
+      await waitForTransition(this.element);
     }
+
+    this.actionSequence.release();
   }
 
   async close() {
-    // Logical guard
-    if (this.isAnimating) return;
-    this.isAnimating = true;
 
-    // Concurrency guard
-    await this.animationGate.acquire();
+    await this.actionSequence.acquire();
 
-    try {
-      const el = this.element;
-
-      el.style.overflow = 'hidden';
-
-      // Determine starting position
-      let currentRight = parseInt(el.style.right, 10);
-
-
-      const step = 10;
-      const delay = 10;
-
-      for (let x = currentRight; x >= -this.drawerWidth; x -= step) {
-        el.style.right = `${x}px`;
-        await wait(delay);
-      }
-
-      // Final state
-      el.style.right = `-${this.drawerWidth}px`;
-      el.style.display = 'none';
-      el.style.overflow = '';
-
-    } finally {
-      this.isAnimating = false;
-      this.animationGate.release();
+    if (this.isOpen) {
+      this.isOpen = false;
+      this.element.classList.remove('shown');
+      await waitForTransition(this.element);
     }
+
+    this.actionSequence.release();
   }
 }
+
 
 
 
@@ -470,9 +430,10 @@ export class ModeSelectionUIC extends StatefulElement {
       this.extraControls.open();
     } else {
       try {
-        await this.extraControls.clear();
-        this.extraControls.setState("testing-from-modeSelector");
-        this.extraControls.element.querySelector("#closeExtraControlsBtn").onclick = this.testCloseExtra;
+        this.extraControls.close();
+        this.extraControls.setState("testing-from-modeSelector", null, this.afterExtraRender);
+        this.extraControls.open();
+
       } catch {
         //!! HANDLE A THROW EG IF STATE IS LOCKED
       }
@@ -505,6 +466,9 @@ export class ModeSelectionUIC extends StatefulElement {
     this.testOpenExtra = this.testOpenExtra.bind(this); 
     this.testCloseExtra = this.testCloseExtra.bind(this); 
     this.initiateAddLink = this.initiateAddLink.bind(this); 
+    
+    // Bind this for callbacks 
+    this.afterExtraRender = this.afterExtraRender.bind(this);
 
     // Define the fixed HTML states for this UIC
     this.defineState("testing",`
@@ -541,6 +505,22 @@ export class ModeSelectionUIC extends StatefulElement {
 
       case "segment-selecting":
         this.element.querySelector("#addLinkBtn").onclick = this.initiateAddLink;
+      break;
+
+      default:
+        //  No default handlers to be set
+
+    }
+    
+  } 
+
+  afterExtraRender(state) {
+  
+    // Create event handling for the defined states of this UIC in addition to setting the HTML state in the super class
+    switch (state) {
+
+      case "testing-from-modeSelector":
+        this.extraControls.element.querySelector("#closeExtraControlsBtn").onclick = this.testCloseExtra;
       break;
 
       default:

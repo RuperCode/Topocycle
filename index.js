@@ -157,15 +157,21 @@ app.post('/api/login', function(req, res) {
 app.get('/api/whoami', function(req, res) {
   console.log(`WhoAmI POSTED`);
   if (!req.session.userId) {
+    console.log('no session id');
     return res.json(null);   // 200 OK, body = null
   }
+  console.log('session id known');
 
   pool.query(
     `SELECT id, username, email, FROM users WHERE id = $1`,
     [req.session.userId],
     function(err, result) {
-      if (err) return res.status(500).json({ error: 'Database error' });
+      if (err) {
+        console.log("Database error");
+        return res.status(500).json({ error: 'Database error' });
+      }
       if (result.rows.length === 0) {
+        console.log("User no longer exists");
         return res.status(500).json({ error: 'User no longer exists' });
       }
 

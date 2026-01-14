@@ -77,10 +77,15 @@ export class UserAccountUIC extends StatefulElement {
     };
 
 
-  constructor(element, account) {
+  constructor(element, messageBar, dialogueBox, extraControls, lock, account) {
 
     super(element);
 
+
+    this.messageBar = messageBar;
+    this.dialogueBox = dialogueBox; 
+    this.extraControls = extraControls;
+    this.lock = lock;
     this.account = account;
 
  // Bind(this) for the event handlers so that they can be used as such a know about 'this'
@@ -102,7 +107,7 @@ export class UserAccountUIC extends StatefulElement {
         </div>
         <div class="user-right">
           <input type="text" id="identifier" placeholder="Username or Email"><br>
-          <input type="text" id="password" placeholder="Password"><br>          
+          <input type="password" id="password" placeholder="Password"><br>          
           <button id="loginBtn">Login</button>
           <p><a href="#" id="registerLink">Not a registered user? Set up as a user now...</a></p>
         </div>
@@ -180,6 +185,7 @@ export class UserAccountUIC extends StatefulElement {
       if (!currentUser) {
         this.setState("loggedOut");
       } else {
+        console.log(currentUser.username);
         this.setState("loggedIn", {currentUserName: currentUser.username});
       }
 

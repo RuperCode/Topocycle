@@ -53,6 +53,7 @@ export class Authenticator {
       credentials: 'include'
     });
 
+    console.log(res);
     // whoami always returns JSON: either null or a user object
     return res.json();
   }

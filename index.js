@@ -163,7 +163,7 @@ app.get('/api/whoami', function(req, res) {
   console.log('session id known');
 
   pool.query(
-    `SELECT id, username, email, FROM users WHERE id = $1`,
+    `SELECT id, username, email FROM users WHERE id = $1`,
     [req.session.userId],
     function(err, result) {
       if (err) {

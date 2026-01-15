@@ -46,15 +46,26 @@ export class Authenticator {
       throw new Error(await res.text());
     }
   }
-
+  
+  
   async check() {
     const res = await fetch('/api/whoami', {
       method: 'GET',
       credentials: 'include'
     });
 
-    console.log(res);
-    // whoami always returns JSON: either null or a user object
+    if (!res.ok) {
+      var err;
+      try {
+        err = await res.json();
+      } catch (e) {
+        err = null;
+      }
+      throw new Error((err && err.error) || 'Unknown server error');
+    }
+
     return res.json();
   }
+
+  
 }

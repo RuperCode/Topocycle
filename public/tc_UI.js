@@ -185,7 +185,7 @@ export class UserAccountUIC extends StatefulElement {
       if (!currentUser) {
         this.setState("loggedOut");
       } else {
-        console.log(currentUser.username);
+
         this.setState("loggedIn", {currentUserName: currentUser.username});
       }
 

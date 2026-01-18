@@ -22,8 +22,7 @@ export class StatefulElement{
   dropState(name) {
     delete this.states[name];
     if (this.currentState === name) {
-      this.currentState = null;
-      this.element.innerHTML = ""; // clear element if active state removed
+      this.clear();
     }
   }
 
@@ -206,7 +205,7 @@ export class Interlocking {
 
   clearInterlock(name) {
     const group = this.interlocks.get(name);
-    if (!group) return;
+    if (!group) return;l
 
     for (const lock of group) {
       const set = this.lockToInterlocks.get(lock);

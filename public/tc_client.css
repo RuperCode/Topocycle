@@ -115,14 +115,7 @@ body {
     }
 
 .user-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 1em;
-}
-
-.user-left {
   text-align: center;
-  min-width: 60px;
 }
 
 .user-icon {
@@ -141,7 +134,7 @@ body {
   color: orange; /* amber tone */
 }
 
-.user-right {
+.user-auth {
   flex: 1;
 }
 

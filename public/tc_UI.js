@@ -577,6 +577,16 @@ export class ModeSelectionUIC extends StatefulElement {
   };
   
 
+  flashMessageA = function () {
+    this.messageBar.flashState("test-a");
+  };
+  
+  
+  flashMessageB = function () {
+    this.messageBar.flashState("test-b", 3000);
+  };
+  
+
   initiateAddLink = function () {
     //!! TO SET NEW STATE HERE AND IN MAP MANAGER
   };
@@ -598,6 +608,8 @@ export class ModeSelectionUIC extends StatefulElement {
     this.testOpenExtra = this.testOpenExtra.bind(this); 
     this.testCloseExtra = this.testCloseExtra.bind(this); 
     this.initiateAddLink = this.initiateAddLink.bind(this); 
+    this.flashMessageA = this.flashMessageA.bind(this);
+    this.flashMessageB = this.flashMessageB.bind(this);
     
     // Bind this for callbacks 
     this.afterExtraRender = this.afterExtraRender.bind(this);
@@ -607,11 +619,8 @@ export class ModeSelectionUIC extends StatefulElement {
       <p>ModeSelectorUIC up and running</p>
       <button id="openExtraControlsBtn">Open Extra Controls</button>
       <button id="showDialogueBoxBtn">Show Dialogue Box</button>
-    `);
-
-    this.extraControls.defineState("testing-from-modeSelector",`
-      <p>ExtraControlsUIC up and running</p>
-      <button id="closeExtraControlsBtn">Close</button>
+      <button id="flashABtn">Flash A</button>
+      <button id="flashBBtn">Flash B</button>
     `);
 
     this.defineState("segment-selecting",`
@@ -619,6 +628,26 @@ export class ModeSelectionUIC extends StatefulElement {
     `);
 
     // DEFINE OTHER REQUIRED STATES HERE
+
+
+
+    // DEFINE STATES FOR EXTRACONTROLS
+    this.extraControls.defineState("testing-from-modeSelector",`
+      <p>ExtraControlsUIC up and running</p>
+      <button id="closeExtraControlsBtn">Close</button>
+    `);
+
+
+    // DEFINE STATES FOR MESSAGEBAR
+    this.messageBar.defineState("test-a",`
+      <p>Test massage AAAAAAAAAA</p>
+    `);
+    
+    this.messageBar.defineState("test-b",`
+      <p>Test massage BB  BB  BB  BB  BB</p>
+    `);
+
+
 
     // INITIATE IN DEFAULT STATE
     this.setState("segment-selecting");
@@ -633,6 +662,8 @@ export class ModeSelectionUIC extends StatefulElement {
       case "testing":
         this.element.querySelector("#showDialogueBoxBtn").onclick = this.testShowDialogue;
         this.element.querySelector("#openExtraControlsBtn").onclick = this.testOpenExtra;
+        this.element.querySelector("#flashABtn").onclick = this.flashMessageA;
+        this.element.querySelector("#flashBBtn").onclick = this.flashMessageB;
       break;
 
       case "segment-selecting":

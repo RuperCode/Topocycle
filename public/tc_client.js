@@ -9,7 +9,8 @@ import {
   ModeSelectionUIC,
   //InfoSectionUIC
   ExtraControlsUIC,
-  DialogueBoxUIC
+  DialogueBoxUIC,
+  MapManagerUIC
 } from './tc_UI.js';
 
 
@@ -21,11 +22,9 @@ const modeSelectionHTML = document.getElementById('mode-selection');
 const infoSectionHTML = document.getElementById("info-section");
 const extraControlsHTML = document.getElementById('extra-controls');
 const dialogueBoxHTML = document.getElementById('dialogue-box');
+const mapManagerHTML = document.getElementById('map');
 
 
-
-// Create a new Leaflet map and set the view zoomed on a fixed location (can make that dynamic in future)
-const map = L.map('map').setView([51.4, -0.35], 13);
 
 // User authentication handler
 const auth = new Authenticator(); 
@@ -37,6 +36,7 @@ const modeSelectionLock = interlocking.newLock();
 const infoSectionLock = interlocking.newLock();
 const extraControlsLock = interlocking.newLock();
 const dialogueBoxLock = interlocking.newLock();
+const mapManagerLock = interlocking.newLock();
 
 
 
@@ -46,16 +46,9 @@ const dialogueBoxUIC = new DialogueBoxUIC(dialogueBoxHTML, dialogueBoxLock);
 const extraControlsUIC = new ExtraControlsUIC(extraControlsHTML, extraControlsLock);
 const userAccountUIC = new UserAccountUIC(userAccountHTML, messageBarUIC, dialogueBoxUIC, extraControlsUIC, userAccountLock, auth);
 //const layersSelectionUIC = new LayersSelectionUIC(layersSelectionHTML);
-const modeSelectionUIC = new ModeSelectionUIC(modeSelectionHTML, messageBarUIC, dialogueBoxUIC, extraControlsUIC, modeSelectionLock);
+const mapManagerUIC =  new MapManagerUIC(mapManagerHTML, mapManagerLock);
+const modeSelectionUIC = new ModeSelectionUIC(modeSelectionHTML, mapManagerUIC, messageBarUIC, dialogueBoxUIC, extraControlsUIC, modeSelectionLock);
 //const infoSectionUIC = new InfoSectionUIC(infoSectionHTML, infoSectionLock);
-
-
-
-  
-// Initialise Leaflet map
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
 
 
 
@@ -66,7 +59,7 @@ function startup(){
   messageBarUIC.setState("test-message");
   modeSelectionUIC.setState("testing");
   userAccountUIC.checkState();
-
+  mapManagerUIC.initMap();
 }
 
 window.addEventListener('load', startup);

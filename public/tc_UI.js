@@ -13,26 +13,19 @@ export class UserAccountUIC extends StatefulElement {
   account; no
 
     authenticate = async function() {
-      
-      if(this.extraControls.getEndState() === "logging-in"){
-        await this.extraControls.open();
+
+      this.extraControls.close();
+      this.extraControls.setState("logging-in", null, this.afterExtraRender);
+      await this.extraControls.open();
+
+      if(this.extraControls.getState() === "logging-in"){
         this.extraControls.lock.lock(this); 
         this.setState("authenticating");
-      } else {
-        this.extraControls.close();
-        this.extraControls.setState("logging-in", null, this.afterExtraRender);
-        await this.extraControls.open();
-
-        if(this.extraControls.getState() === "logging-in"){
-          this.extraControls.lock.lock(this); 
-          this.setState("authenticating");
-        else { 
-          this.messageBar.flashState("login-unavailable");
-          this.extraControls.lock.unlock(this); 
-        }
-         
+      else { 
+        this.messageBar.flashState("login-unavailable");
+        this.extraControls.lock.unlock(this); 
       }
-
+         
     };
 
 
@@ -461,8 +454,9 @@ export class MessageBarUIC extends StatefulElement {
 
 export class ExtraControlsUIC extends StatefulElement {
 
-  constructor(element) {
+  constructor(element, lock) {
     super(element);
+    this.lock = lock;
     this.actionSequence = new AsyncGate();
     this.endState = null
     this.isOpen = false;
@@ -476,7 +470,7 @@ export class ExtraControlsUIC extends StatefulElement {
 
     if(this.lock.isInterlocked()){
       this.actionSequence.release();
-      return;
+      return false;
     }
 
     super.setState(state, params);
@@ -594,10 +588,11 @@ export class ModeSelectionUIC extends StatefulElement {
 
 
 
-  constructor(element, messageBar, dialogueBox, extraControls, lock){
+  constructor(element, mapManager, messageBar, dialogueBox, extraControls, lock){
 
     super(element);
     
+    this.mapManager = mapManager;
     this.messageBar = messageBar;
     this.dialogueBox = dialogueBox;
     this.extraControls = extraControls;
@@ -703,4 +698,85 @@ export class ModeSelectionUIC extends StatefulElement {
   
 }
 
+
+
+
+
+//---------------------------------------------------------------
+
+
+
+
+
+class MapManagerUIC {
+    constructor(element, lock) {
+
+        this.element = element;
+        this.lock = lock;
+
+        this.map = null;
+
+        this.currentMode = null;
+
+        this.modes = {};
+
+        // Active callbacks for the current mode
+        this.callbacks = {
+            onEnter: null,
+            onExit: null,
+            onMapReady: null
+        };
+    }
+
+    defineMode(name, callbacks = {}) {
+        this.modes[name] = {
+            onEnter: callbacks.onEnter || null,
+            onExit: callbacks.onExit || null,
+            onMapReady: callbacks.onMapReady || null
+        };
+    }
+
+    initMap() {
+    
+        this.map = L.map(this.element.id).setView([51.4, -0.35], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(this.map);
+
+    }
+
+    setMode(modeName) {
+
+        if (!this.map) {
+            this.initMap();
+        }
+
+        // Exit callback for previous mode
+        if (this.callbacks.onExit) {
+            this.callbacks.onExit();
+        }
+
+        // Switch mode
+        this.currentMode = modeName;
+
+        // Load callbacks for new mode
+        const def = this.modes[modeName] || {};
+        this.callbacks.onEnter = def.onEnter || null;
+        this.callbacks.onExit = def.onExit || null;
+        this.callbacks.onMapReady = def.onMapReady || null;
+
+        // Enter callback
+        if (this.callbacks.onEnter) {
+            this.callbacks.onEnter();
+        }
+    }
+
+    destroy() {
+        if (this.map) {
+            this.map.remove();
+            this.map = null;
+        }
+    }
+}
 

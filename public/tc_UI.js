@@ -1,4 +1,5 @@
 import { StatefulElement, AsyncGate } from './tc_tools.js';
+import {  } from './tc_mapping.js';
 import { wait, waitForTransition} from './tc_tools.js';
 
 
@@ -708,7 +709,7 @@ export class ModeSelectionUIC extends StatefulElement {
 
 
 
-class MapManagerUIC {
+export class MapManagerUIC {
     constructor(element, lock) {
 
         this.element = element;

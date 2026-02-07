@@ -11,30 +11,50 @@ export class UserAccountUIC extends StatefulElement {
   dialogueBox; 
   extraControls;
   lock;
-  account; no
+  account;
 
     authenticate = async function() {
 
+      if (this.lock.isLocked()) return;
+
+      this.lock.lock(this);
+
       this.extraControls.close();
       this.extraControls.setState("logging-in", null, this.afterExtraRender);
-      await this.extraControls.open();
 
-      if(this.extraControls.getState() === "logging-in"){
-        this.extraControls.lock.lock(this); 
-        this.setState("authenticating");
-      else { 
+      try {
+        await this.extraControls.open();
+
+        if(this.extraControls.getState() === "logging-in"){
+          this.extraControls.lock.lock(this); 
+          this.setState("authenticating");
+        } else { 
+          this.messageBar.flashState("login-unavailable");
+        }
+         
+      } catch(err){
+        // This should be an error dialogue really...
         this.messageBar.flashState("login-unavailable");
         this.extraControls.lock.unlock(this); 
+      } finally {
+        this.lock.unlock(this);
       }
-         
+
     };
 
 
     cancelAuthentication = function() {
+
+      
+      if (this.lock.isLocked()) return;
+      this.lock.lock(this);
+
+      this.extraControls.close(this);
+      this.extraControls.clear(this);
       this.extraControls.lock.unlock(this);  
-      this.extraControls.close();
-      this.extraControls.clear();
       this.setState("logged-out");
+
+      this.lock.unlock(this);
 
     };
 
@@ -43,41 +63,52 @@ export class UserAccountUIC extends StatefulElement {
 
     submitLogin = async function() {
 
-      const identifier = this.element.querySelector("#identifier").value;
-      const password = this.element.querySelector("#password").value;
+      if (this.lock.isLocked()) return;
+      this.lock.lock(this);
+
+      const identifier = this.extraControls.element.querySelector("#identifier").value;
+      const password = this.extraControls.element.querySelector("#password").value;
 
       try {
         const currentUser = await this.account.login(identifier, password);
+        this.extraControls.close(this);
+        this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.extraControls.close();
-        this.extraControls.clear();
         this.setState("logged-in", {currentUserName: currentUser.username});
     
       } catch (err) {
+        this.extraControls.close(this);
+        this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.extraControls.close();
-        this.extraControls.clear();
         this.setState("logged-out");
         let message = "Login failed: " + err.message;
         this.dialogueBox.setState("notifying", {message: message}, null);
 
+      } finally {
+        this.lock.unlock(this);
       }
 
     };
 
     register = function() {
-      this.extraControls.lock.unlock(this);
-      this.extraControls.close();
-      this.extraControls.setState("registering", null, this.afterExtraRender);
-      this.extraControls.open();
-      this.extraControls.lock.lock(this);
+
+      if (this.lock.isLocked()) return;
+      this.lock.lock(this);
+
+      this.extraControls.close(this);
+      this.extraControls.setState("registering", null, this.afterExtraRender, this);
+      this.extraControls.open(this);
+
+      this.lock.unlock(this);
+
     };
 
     submitRegistration = async function() {
-      const username = this.element.querySelector("#regUsername").value;
-      const email = this.element.querySelector("#regEmail").value;
-      const password = this.element.querySelector("#regPassword").value;
-      const confirm = this.element.querySelector("#regConfirm").value;
+
+      const username = this.extraControls.element.querySelector("#regUsername").value;
+      const email = this.extraControls.element.querySelector("#regEmail").value;
+      const password = this.extraControls.element.querySelector("#regPassword").value;
+      const confirm = this.extraControls.element.querySelector("#regConfirm").value;
 
       if (password !== confirm) {
         this.element.querySelector("#regMessage").textContent = "Passwords do not match.";
@@ -88,27 +119,33 @@ export class UserAccountUIC extends StatefulElement {
         return;
       }
 
+      if (this.lock.isLocked()) return;
+      this.lock.lock(this);
+
       try {
         const currentUser = await this.account.register(username, email, password);
+        this.extraControls.close(this);
+        this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.extraControls.close();
-        this.extraControls.clear();
         this.setState("logged-in", {currentUserName: currentUser.username});
         
       } catch (err) {
+        this.extraControls.close(this);
+        this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.extraControls.close();
-        this.extraControls.clear();
         this.setState("logged-out");
         let message = "Registration failed: " + err.message;
         this.dialogueBox.setState("notifying", {message: message}, null);
+
+      } finally {
+        this.lock.unlock(this);
       }
 
     };
     
 
     submitLogout = async function() {
-    
+
       try {
         await this.account.logout();
         this.setState("logged-out");
@@ -117,17 +154,28 @@ export class UserAccountUIC extends StatefulElement {
         let message = "Log out failed: " + err.message;
         this.dialogueBox.setState("notifying", {message: message}, null);
    
-      }  
+      } finally {
+        this.lock.unlock(this);
+      }
       
     };
 
 
+    cancelLogout = async function() {
+      this.lock.unlock(this);
+    };
+
+
     logout = function() {
+
+      if (this.lock.isLocked()) return;
+      this.lock.lock(this);
+
       this.dialogueBox.setState(
         "confirming", 
         {confirmation: "Are you sure you want to log out?"}, 
         this.submitLogout, 
-        null
+        this.cancelLogout
       );
     };
 
@@ -149,6 +197,8 @@ export class UserAccountUIC extends StatefulElement {
     this.submitRegistration = this.submitRegistration.bind(this);
     this.submitLogout= this.submitLogout.bind(this);
     this.cancelAuthentication = this.cancelAuthentication.bind(this);
+    this.cancelLogout = this.cancelLogout.bind(this);
+    this.afterExtraRender = this.afterExtraRender.bind(this)
 
 
     // Define the fixed HTML states for this UIC
@@ -181,6 +231,7 @@ export class UserAccountUIC extends StatefulElement {
     // Define the fixed HTML states for extraControls
     this.extraControls.defineState("logging-in",`
       <div class="user-auth">
+        <h3>Login</h3>
         <input type="text" id="identifier" placeholder="Username or Email"><br>
         <input type="password" id="password" placeholder="Password"><br>          
         <button id="confirmLoginBtn">Login</button>
@@ -191,6 +242,7 @@ export class UserAccountUIC extends StatefulElement {
 
     this.extraControls.defineState("registering",`
       <div class="user-auth">
+        <h3>Register</h3>
         <input type="text" id="regUsername" placeholder="Username"><br>
         <input type="email" id="regEmail" placeholder="Email"><br>
         <input type="password" id="regPassword" placeholder="Password"><br>
@@ -201,7 +253,7 @@ export class UserAccountUIC extends StatefulElement {
       </div>
     `);
 
-    this.messageBar.defineState("login-unavailabe",`
+    this.messageBar.defineState("login-unavailable",`
       <p>Current action must be completed before logging in</p>
     `);
 
@@ -237,14 +289,14 @@ export class UserAccountUIC extends StatefulElement {
     switch (state) {
 
       case "logging-in":
-        this.element.querySelector("#confirmLoginBtn").onclick = this.submitLogin;
-        this.element.querySelector("#cancelLoginBtn").onclick = this.cancelAuthentication;    
-        this.element.querySelector("#registerLink").onclick = this.register;
+        this.extraControls.element.querySelector("#confirmLoginBtn").onclick = this.submitLogin;
+        this.extraControls.element.querySelector("#cancelLoginBtn").onclick = this.cancelAuthentication;    
+        this.extraControls.element.querySelector("#registerLink").onclick = this.register;
       break;
 
       case "registering":
-        this.element.querySelector("#confirmRegBtn").onclick = this.submitRegistration;
-        this.element.querySelector("#cancelRegBtn").onclick = this.cancelAuthentication;
+        this.extraControls.element.querySelector("#confirmRegBtn").onclick = this.submitRegistration;
+        this.extraControls.element.querySelector("#cancelRegBtn").onclick = this.cancelAuthentication;
         
       break;
 
@@ -262,16 +314,16 @@ export class UserAccountUIC extends StatefulElement {
       const currentUser = await this.account.check();
 
       if (!currentUser) {
-        this.setState("loggedOut");
+        this.setState("logged-out");
       } else {
 
-        this.setState("loggedIn", {currentUserName: currentUser.username});
+        this.setState("logged-in", {currentUserName: currentUser.username});
       }
 
     } catch (err) {
       //Call to check function failed
       //NEED TO HANDLE ERRORS HERE MORE PROPERLY
-      this.setState("loggedOut");
+      this.setState("logged-out");
     }
   
   }
@@ -288,64 +340,61 @@ export class UserAccountUIC extends StatefulElement {
 
 export class DialogueBoxUIC extends StatefulElement {
 
-// Define event handlers in class field functions before constructor so we can bind(this) in this constructor
+  // Private field declaration only (no initialisation here)
   #displaySequence;
+
   confirmCallback;
   cancelCallback;
-    
+
+  // Event handlers defined as class fields so they can be bound in constructor
   dismiss = function () {
     this.clear();
-    if(this.confirmCallback){
+    if (this.confirmCallback) {
       this.confirmCallback();
     }
   };
 
   confirm = function () {
     this.clear();
-    if(this.confirmCallback){
+    if (this.confirmCallback) {
       this.confirmCallback();
     }
   };
-  
-  
+
   cancel = function () {
     this.clear();
-    if(this.cancelCallback){
+    if (this.cancelCallback) {
       this.cancelCallback();
     }
   };
 
-
-  constructor(element, lock) {
-
+  constructor(element) {
     super(element);
-    
-    #displaySequence = new AsyncGate();   
 
-    // Bind(this) for the event handlers so that they can be used as such and know about 'this'
+    // Initialise the private gate here (correct syntax)
+    this.#displaySequence = new AsyncGate();
+
+    // Bind event handlers
     this.dismiss = this.dismiss.bind(this);
     this.confirm = this.confirm.bind(this);
     this.cancel = this.cancel.bind(this);
 
-    // Define the fixed HTML states for this UIC
-    this.defineState("notifying",`
+    // Define the fixed HTML states
+    this.defineState("notifying", `
       <p>$message</p>
       <button id="dismissPopupBtn">Dismiss</button>
     `);
 
-    this.defineState("confirming",`
+    this.defineState("confirming", `
       <p>$confirmation</p>
       <button id="confirmPopupBtn">Confirm</button>
       <button id="cancelPopupBtn">Cancel</button>
     `);
-
-
   }
-
 
   async setState(state, params, confirmCallback, cancelCallback) {
 
-    await this.displaySequence.acquire();
+    await this.#displaySequence.acquire();
 
     this.confirmCallback = confirmCallback;
     this.cancelCallback = cancelCallback;
@@ -353,47 +402,42 @@ export class DialogueBoxUIC extends StatefulElement {
     super.setState(state, params);
 
   }
-  
 
   afterRender(state) {
-  
-    // Create event handling for the defined states of this UIC
+
     switch (state) {
 
       case "notifying":
         this.element.querySelector("#dismissPopupBtn").onclick = this.dismiss;
         this.show();
-      break;
+        break;
 
       case "confirming":
         this.element.querySelector("#confirmPopupBtn").onclick = this.confirm;
         this.element.querySelector("#cancelPopupBtn").onclick = this.cancel;
         this.show();
-      break;
+        break;
 
       default:
-        // No default handlers to be set
-
+        // No default handlers
     }
-
   }
-  
-  
+
   clear() {
     this.hide();
     super.clear();
-    this.displaySequence.release();
+
+    this.#displaySequence.release();
   }
-  
+
   show() {
     this.element.style.display = 'block';
   }
-  
+
   hide() {
     this.element.style.display = 'none';
   }
-  
-  
+
 }
 
 
@@ -434,7 +478,11 @@ export class MessageBarUIC extends StatefulElement {
     this.setState(state);
 
     // Wait
-    await wait(duration);
+    try {
+      await wait(duration);
+    } catch (err) {
+      // swallows error to ensure state reversion runs in any event
+    }
 
     // Only the latest flash is allowed to revert
     if (myFlashId === this.flashCounter) {
@@ -453,7 +501,7 @@ export class MessageBarUIC extends StatefulElement {
 
 
 
-export class ExtraControlsUIC extends StatefulElement {
+export class OLD_ExtraControlsUIC extends StatefulElement {
 
   constructor(element, lock) {
     super(element);
@@ -476,8 +524,12 @@ export class ExtraControlsUIC extends StatefulElement {
 
     super.setState(state, params);
 
-    if (afterAfterRender) {
-      afterAfterRender(state);
+    try {
+      if (afterAfterRender) {
+        afterAfterRender(state);
+      }
+    } catch(err) {
+      // Swallow error to ensure actionSequence released in any event
     }
 
     this.actionSequence.release();
@@ -542,6 +594,118 @@ export class ExtraControlsUIC extends StatefulElement {
   
 }
 
+
+
+export class ExtraControlsUIC extends StatefulElement {
+
+  constructor(element, lock) {
+    super(element);
+    this.lock = lock;
+    this.actionSequence = new AsyncGate();
+    this.endState = null;
+    this.isOpen = false;
+  }
+
+  async setState(state, params, afterAfterRender, caller) {
+
+    this.endState = state;
+
+    await this.actionSequence.acquire();
+    try {
+
+      if (this.lock.isInterlocked(caller)) {
+        return false;
+      }
+
+      super.setState(state, params);
+
+      if (afterAfterRender) {
+        try {
+          afterAfterRender(state);
+        } catch (err) {
+          // swallow to avoid deadlock; caller can log if needed
+        }
+      }
+
+    } finally {
+      this.actionSequence.release();
+    }
+  }
+
+  async clear(caller) {
+
+    this.endState = null;
+
+    await this.actionSequence.acquire();
+
+    try {
+
+      if (this.lock.isInterlocked(caller)) {
+        return;
+      }
+
+      super.clear();
+
+    } finally {
+      this.actionSequence.release();
+    }
+  }
+
+  async open(caller) {
+
+    await this.actionSequence.acquire();
+
+    try {
+
+      if (this.lock.isInterlocked(caller)) {
+        return;
+      }
+
+      if (!this.isOpen) {
+        this.isOpen = true;
+        this.element.classList.add('shown');
+        try {
+          await waitForTransition(this.element);
+        } catch (err) {
+          // swallow transition errors to avoid deadlock
+        }
+      }
+
+    } finally {
+      this.actionSequence.release();
+    }
+  }
+
+  async close(caller) {
+
+    await this.actionSequence.acquire();
+
+    try {
+
+      if (this.lock.isInterlocked(caller)) {
+        return;
+      }
+
+      if (this.isOpen) {
+        this.isOpen = false;
+        this.element.classList.remove('shown');
+        try {
+          await waitForTransition(this.element);
+        } catch (err) {
+          // swallow transition errors to avoid deadlock
+        }
+      }
+
+    } finally {
+      this.actionSequence.release();
+    }
+  }
+
+  getEndState() {
+    return this.endState;
+  }
+
+}
 
 
 

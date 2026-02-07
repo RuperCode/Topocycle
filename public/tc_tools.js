@@ -108,18 +108,49 @@ export class Lock {
     this.#interlocking = interlocking;
   }
 
-  isLocked() {
-    return this.currentKey !== null;
+  isLocked(key) {
+
+    if(this.currentKey){
+
+      if(this.currentKey === key){
+        //returns as false (unlocked) if the key presented is the one it is locked with
+        return false;
+      } else {
+        return true;  
+      }
+
+    } else {
+      return false;
+    }
+
   }
 
-  isInterLocked() {
+  isInterlocked(key) {
     if (!this.#interlocking) return false;
-    return this.#interlocking.isInterlocked(this);
+    if(this.#interlocking.isInterlocked(this)){
+      return true;
+    } else {
+
+      if(this.currentKey){
+
+        if(this.currentKey === key){
+          //returns as false (unlocked) if the key presented is the one it is locked with
+          return false;
+        } else {
+          return true;  
+        }
+
+      } else {
+        return false;
+      }
+
+    }
+
   }
 
   lock(key) {
     if (this.isLocked()) return false;
-    if (this.isInterLocked()) return false;
+    if (this.isInterlocked()) return false;
     this.currentKey = key;
     return true;
   }

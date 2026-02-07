@@ -33,16 +33,16 @@ const auth = new Authenticator();
 const interlocking =  new Interlocking();
 const userAccountLock = interlocking.newLock();
 const modeSelectionLock = interlocking.newLock();
-const infoSectionLock = interlocking.newLock();
+// const infoSectionLock = interlocking.newLock();
 const extraControlsLock = interlocking.newLock();
-const dialogueBoxLock = interlocking.newLock();
+// const dialogueBoxLock = interlocking.newLock();
 const mapManagerLock = interlocking.newLock();
 
 
 
 // Instatiate handlers for UI components
 const messageBarUIC = new MessageBarUIC(messageBarHTML);
-const dialogueBoxUIC = new DialogueBoxUIC(dialogueBoxHTML, dialogueBoxLock);
+const dialogueBoxUIC = new DialogueBoxUIC(dialogueBoxHTML);
 const extraControlsUIC = new ExtraControlsUIC(extraControlsHTML, extraControlsLock);
 const userAccountUIC = new UserAccountUIC(userAccountHTML, messageBarUIC, dialogueBoxUIC, extraControlsUIC, userAccountLock, auth);
 //const layersSelectionUIC = new LayersSelectionUIC(layersSelectionHTML);

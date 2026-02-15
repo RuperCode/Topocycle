@@ -1,5 +1,5 @@
 import { StatefulElement, AsyncGate } from './tc_tools.js';
-import {  } from './tc_mapping.js';
+import { Junction, Segment, NetworkLayer, NetworkLayerStack, MapUILayer } from './tc_mapping.js';
 import { wait, waitForTransition} from './tc_tools.js';
 
 
@@ -744,16 +744,41 @@ export class ModeSelectionUIC extends StatefulElement {
   flashMessageB = function () {
     this.messageBar.flashState("test-b", 3000);
   };
+
+  endTest = function () {
+    this.clear();
+  };
   
 
-  initiateAddLink = function () {
-    //!! TO SET NEW STATE HERE AND IN MAP MANAGER
+  initiateAddSegment = function () {
+    this.layerSelector.lock();
+    this.mapManager.setMode(new AddSegmentMode());
+    this.setState("segment-adding-a");
   };
 
+  cancelAddSegment = function () {
+
+  }
+  
+  addSegmentUndoStage = function () {
+
+  }
+
+  confirmAddSegment = function () {     
+  
+  }
+
+  confirmedAddSegment = function () {
+  
+  }
+
+  onModeEnd = function () {
+    this.layerSelector.unlock();
+    this.clear();     
+  }
 
 
-
-  constructor(element, mapManager, messageBar, dialogueBox, extraControls, lock){
+  constructor(element, mapManager, messageBar, dialogueBox, extraControls, layerSelector, lock){
 
     super(element);
     
@@ -761,15 +786,20 @@ export class ModeSelectionUIC extends StatefulElement {
     this.messageBar = messageBar;
     this.dialogueBox = dialogueBox;
     this.extraControls = extraControls;
+    this.layerSelector = layerSelector;
     this.lock = lock;
 
     // Bind(this) for the event handlers so that they can be used as such a know about 'this'
     this.testShowDialogue = this.testShowDialogue.bind(this); 
     this.testOpenExtra = this.testOpenExtra.bind(this); 
     this.testCloseExtra = this.testCloseExtra.bind(this); 
-    this.initiateAddLink = this.initiateAddLink.bind(this); 
     this.flashMessageA = this.flashMessageA.bind(this);
     this.flashMessageB = this.flashMessageB.bind(this);
+    this.endTest = this.endTest.bind(this);
+    this.initiateAddSegment = this.initiateAddSegment.bind(this);
+    this.cancelAddSegment = this.cancelAddSegment.bind(this);
+    this.addSegmentUndoStage = this.addSegmentUndoStage.bind(this);
+    this.onModeEnd = this.onModeEnd.bind(this);
     
     // Bind this for callbacks 
     this.afterExtraRender = this.afterExtraRender.bind(this);
@@ -781,15 +811,36 @@ export class ModeSelectionUIC extends StatefulElement {
       <button id="showDialogueBoxBtn">Show Dialogue Box</button>
       <button id="flashABtn">Flash A</button>
       <button id="flashBBtn">Flash B</button>
+      <button id="endTestBtn">Flash C</button>
     `);
 
     this.defineState("segment-selecting",`
-      <button id="addLinkBtn">Add Link</button>
+      <button id="addSegmentBtn">Add Segment</button>
     `);
+
+
+    this.defineState("segment-adding-a",`
+      <button id="cancelAddSegmentBtn">Cancel</button>
+    `);
+
+    this.defineState("segment-adding-b",`
+      <button id="undoAddSegmentStageBtn">Undo</button>
+      <button id="cancelAddSegmentBtn">Cancel</button>
+    `);
+
+    this.defineState("segment-adding-confirm",`
+      <button id="undoAddSegmentStageBtn">Undo</button>
+      <button id="cancelAddSegmentBtn">Cancel</button>
+      <button id="confirmAddSegmentBtn">Confirm</button>
+    `);
+
+
 
     // DEFINE OTHER REQUIRED STATES HERE
 
+    // SET THE DEFAULT STATE
 
+    this.defaultState = "segment_selecting"
 
     // DEFINE STATES FOR EXTRACONTROLS
     this.extraControls.defineState("testing-from-modeSelector",`
@@ -824,10 +875,27 @@ export class ModeSelectionUIC extends StatefulElement {
         this.element.querySelector("#openExtraControlsBtn").onclick = this.testOpenExtra;
         this.element.querySelector("#flashABtn").onclick = this.flashMessageA;
         this.element.querySelector("#flashBBtn").onclick = this.flashMessageB;
+        this.element.querySelector("#endTestBtn").onclick = this.endTest;
       break;
 
       case "segment-selecting":
-        this.element.querySelector("#addLinkBtn").onclick = this.initiateAddLink;
+        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+      break;
+
+      case "segment-selecting":
+        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+      break;
+
+      case "segment-adding-a":
+        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+      break;
+
+      case "segment-adding-b":
+        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+      break;
+
+      case "segment-adding-confirm":
+        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
       break;
 
       default:
@@ -856,7 +924,7 @@ export class ModeSelectionUIC extends StatefulElement {
   
   clear() {
     // Overridden to effect a default state
-    this.setState("segment-selecting");
+    this.setState(this.defaultState);
 
   }
   
@@ -874,74 +942,83 @@ export class ModeSelectionUIC extends StatefulElement {
 
 
 export class MapManagerUIC {
-    constructor(element, lock) {
 
-        this.element = element;
-        this.lock = lock;
 
-        this.map = null;
+  constructor(element, lock) {
 
-        this.currentMode = null;
+    this.element = element;
+    this.lock = lock;
+    this.currentMode = null;
 
-        this.modes = {};
+    this.map = null;
+    this.baseLayer = null
+    this.networkLayerStack = new NetworkLayerStack();
+    this.mapUILayer = new MapUILayer();
 
-        // Active callbacks for the current mode
-        this.callbacks = {
-            onEnter: null,
-            onExit: null,
-            onMapReady: null
-        };
-    }
+    //!! TEMPORARY - TO BE REPLACED WITH SERVER INTERACTION IN LayerSelectorUIC
+    this.networkLayerStack.addLayer(new NetworkLayer(1, "New Layer"));
 
-    defineMode(name, callbacks = {}) {
-        this.modes[name] = {
-            onEnter: callbacks.onEnter || null,
-            onExit: callbacks.onExit || null,
-            onMapReady: callbacks.onMapReady || null
-        };
-    }
+  }
 
-    initMap() {
+  initMap() {
+
+    this.map = L.map(this.element.id).setView([51.4, -0.35], 13);
     
-        this.map = L.map(this.element.id).setView([51.4, -0.35], 13);
+    this.baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(this.map);
+    this.renderMap()
 
+  }
+
+  refreshMap() {
+    if (!this.map) {
+      return;
+    }
+    this.map.clearLayers();
+    this.map.renderMap();
+  }
+
+  renderMap() {
+    if (!this.map) {
+      return;
+    }
+    this.map.addLayer(this.baseLayer);
+    this.map.addLayer(this.networkLayerStack.getLeaflet())
+    this.map.addLayer(this.mapUILayer.getLeaflet())
+  }
+
+  setMode(mode) {
+    if (this.currentMode) {
+      this.currentMode.deactivate();
     }
 
-    setMode(modeName) {
+    this.currentMode = mode;
 
-        if (!this.map) {
-            this.initMap();
-        }
-
-        // Exit callback for previous mode
-        if (this.callbacks.onExit) {
-            this.callbacks.onExit();
-        }
-
-        // Switch mode
-        this.currentMode = modeName;
-
-        // Load callbacks for new mode
-        const def = this.modes[modeName] || {};
-        this.callbacks.onEnter = def.onEnter || null;
-        this.callbacks.onExit = def.onExit || null;
-        this.callbacks.onMapReady = def.onMapReady || null;
-
-        // Enter callback
-        if (this.callbacks.onEnter) {
-            this.callbacks.onEnter();
-        }
+    if (mode) {
+      mode.activate(this);
     }
+  }
 
-    destroy() {
-        if (this.map) {
-            this.map.remove();
-            this.map = null;
-        }
+  getMode() {
+    return this.currentMode;
+  }
+
+  exitMode() {
+    if (this.currentMode) {
+      this.currentMode.deactivate();
+      this.currentMode = null;
     }
+  }
+
+  destroyMap() {
+    if (this.map) {
+        this.map.remove();
+        this.map = null;
+    }
+  }
+
+
 }
 

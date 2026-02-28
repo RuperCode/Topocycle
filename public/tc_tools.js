@@ -3,6 +3,12 @@ export function wait(ms) {
 }
 
 export class StatefulElement{
+
+  element;
+  states = {};
+  currentState;
+  onStateChange;
+
   constructor(element) {
     if (!(element instanceof HTMLElement)) {
       throw new Error("Constructor requires an HTML element");
@@ -10,7 +16,9 @@ export class StatefulElement{
     this.element = element;
     this.states = {};        // stateName -> template string
     this.currentState = null;
+    this.onStateChange = null;
   }
+
 
   defineState(name, template) {
     if (this.states.hasOwnProperty(name)) {
@@ -26,7 +34,11 @@ export class StatefulElement{
     }
   }
 
-  setState(name, params = {}) {
+  setState(name, params = {}, afterAfterRender, onStateChange) {
+  
+    this.onStateChange();
+    this.onStateChange = onStateChange;
+  
     if (!this.states.hasOwnProperty(name)) {
       throw new Error('State "' + name + '" not defined');
     }
@@ -73,6 +85,15 @@ export class StatefulElement{
     this.currentState = name;
 
     this.afterRender(name);
+    
+    if (afterAfterRender) {
+      try {
+        afterAfterRender(state);
+      } catch (err) {
+        // swallow to avoid deadlock; caller can log if needed
+      }
+    }
+    
   }
 
 
@@ -85,6 +106,10 @@ export class StatefulElement{
   }
   
   clear() {
+  
+    this.onStateChange();
+    this.onStateChange = null;
+  
     this.element.innerHTML = ""; 
     this.currentState = null;
   }
@@ -92,6 +117,10 @@ export class StatefulElement{
   afterRender(state){
     //FOR SUBCLASSSES TO OVERRIDE
   }
+  
+  getElement() {
+    return this.element;   
+  } 
 
 }
 

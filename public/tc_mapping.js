@@ -65,19 +65,48 @@ export class Segment {
 
 export class NetworkLayer {
 
-    constructor(id = null, name) {
+    constructor(id = null, name = "New Schema", owner = null) {
         this.id = id;
         this.name = name;
+        this.owner = owner;
 
         this.junctions = {};   // id → Junction
         this.segments = {};    // id → Segment
 
         this.leaflet = L.layerGroup();
+        
+        this.renderingSchema = null;
 
         //temporary functionality until server implemented
         this._junctionIdCounter = 1;
         this._segmentIdCounter = 1;
     }
+    
+    setRenderingSchema(schema) {
+        this.renderingSchema = schema;
+        this.rebuildAllPolylines();
+    }
+    
+    getRenderingSchema() {
+        return this.renderingSchema;
+    }
+
+
+    setName(newName) {
+        this.name = newName;
+    }
+    
+    getName() {
+        return this.name;
+    }
+    
+
+    isOwnedBy(userID) {
+        return (this.owner === userID);
+    }
+
+
+
 
     // -------------------------------------------------------------
     // Junctions
@@ -174,10 +203,7 @@ export class NetworkLayer {
 
         const latlngs = seg.buildLatLngs(jA, jB);
 
-        seg._polyline = L.polyline(latlngs, {
-            color: '#3388ff',
-            weight: 4
-        });
+        seg._polyline = L.polyline(latlngs, this.renderingSchema.resolveSegmentStyle(seg));
 
         seg._polyline.addTo(this.leaflet);
     }
@@ -204,6 +230,8 @@ export class NetworkLayerStack {
 
     layerOrder = [];
     layers = {};
+    visibility = {};
+    activeLayer;
     leaflet;
 
     constructor() {
@@ -217,6 +245,8 @@ export class NetworkLayerStack {
 
         this.layers[id] = layerObject;
         this.layerOrder.push(id);
+        this.visibility[id] = true;
+        
         this.leaflet.addLayer(layerObject.getLeaflet());
 
         return id;
@@ -254,6 +284,21 @@ export class NetworkLayerStack {
             return null; 
         }
     }
+
+
+    setVisible(layerId, visible) {
+        this.visibility[layerId] = !!visible;
+        if (!visible) { 
+          this.leaflet.removeLayer(this.layers[layerId].getLeaflet());
+        } else {
+          this.#rebuildLeafletOrder();
+        }
+    }
+
+    isVisible(layerId) {
+        return this.visibility[layerId];
+    }
+
 
     moveLayerUp(id) {
         const index = this.layerOrder.indexOf(id);
@@ -295,15 +340,54 @@ export class NetworkLayerStack {
         for (let i = 0; i < this.layerOrder.length; i++) {
             const id = this.layerOrder[i];
             const layer = this.layers[id];
-            if (layer) {
+            const visible = this.visibility[id];
+            if (layer && visible) {
                 this.leaflet.addLayer(layer.getLeaflet());
             }
         }
+    }
+    
+    
+    refreshLayer(id) {
+        this.layers[id].rebuildAllPolylines();
+    }
+    
+    refreshLayersThatUseSchema(schemaId) {
+        for (const id of this.layerOrder) {
+            const layer = this.layers[id];
+            if (!layer) continue;
+
+            const schema = layer.getRenderingSchema();
+            if (schema && schema.id === schemaId) {
+                layer.rebuildAllPolylines();
+            }
+        }
+    }
+    
+    
+    getLayers() {
+        return this.layers; 
     }
 
     getLayer(id) {
         return this.layers[id] || null;
     }
+
+    getOrderedLayers() {
+        var result = [];
+        var i, id;
+
+        for (i = 0; i < this.layerOrder.length; i++) {
+            id = this.layerOrder[i];
+            if (this.layers[id]) {
+                result.push(this.layers[id]);
+            }
+        }
+
+        return result;
+    }
+
+
 
     getLeaflet() {
         return this.leaflet;
@@ -465,3 +549,73 @@ export class MapUILayer {
         this._highlight = null;
     }
 }
+
+
+
+
+
+
+//>>>----------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+export class RenderingSchema {
+
+    defaultColour;
+    defaultWeight;
+    
+    constructor(id = null, name = "New Schema", owner = null) {
+        this.id = id;
+        this.owner = owner;
+        this.defaultColour = '#3388ff';  
+        this.defaultWeight = 4;
+    }
+
+
+    setName(newName) {
+        this.name = newName;
+    }
+    
+    getName() {
+        return this.name;
+    }
+    
+
+    setDefaultColour(colour) {
+        const probe = document.createElement("div");
+        probe.style.color = colour;
+
+        if (!probe.style.color) {
+            throw new Error(`Invalid colour: ${colour}`);
+        }
+
+        this.defaultColour = probe.style.color;
+        
+    }
+    
+    getDefaultColour() {
+        return defaultColour;
+    }
+
+
+    setDefaultWeight(weight) {
+        this.defaultWeight = weight;
+    }
+    
+    getDefaultWeight() {
+        return defaultWeight;
+    }
+
+
+    resolveSegmentStyle(segment) {
+        return {
+            color: defaultColour,
+            weight: defaultWeight
+        };
+    } 
+
+}
+

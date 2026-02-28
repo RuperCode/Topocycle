@@ -51,8 +51,8 @@ export class MapManagerMode {
         this.activeLayer = null;
 
         // Signal end of workflow
-        this.modeSelector.onModeEnd();
-    }
+        this.modeSelector.onModeEnded(this);
+    }i
 
     cancel() {
         this.mapManager.exitMode();
@@ -162,8 +162,9 @@ export class AddSegmentMode extends MapManagerMode {
             return;
         }
     }
-
+    
     cancel() {
         this.mapManager.exitMode();
     }
+
 }

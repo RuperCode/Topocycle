@@ -20,14 +20,14 @@ export class UserAccountUIC extends StatefulElement {
       this.lock.lock(this);
 
       this.extraControls.close();
-      this.extraControls.setState("logging-in", null, this.afterExtraRender);
+      this.extraControls.setState("logging-in", null, this.afterExtraRender, null);
 
       try {
         await this.extraControls.open();
 
         if(this.extraControls.getState() === "logging-in"){
           this.extraControls.lock.lock(this); 
-          this.setState("authenticating");
+          this.setState("authenticating", null, null, null);
         } else { 
           this.messageBar.flashState("login-unavailable");
         }
@@ -74,13 +74,13 @@ export class UserAccountUIC extends StatefulElement {
         this.extraControls.close(this);
         this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.setState("logged-in", {currentUserName: currentUser.username});
+        this.setState("logged-in", {currentUserName: currentUser.username}, null, null);
     
       } catch (err) {
         this.extraControls.close(this);
         this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.setState("logged-out");
+        this.setState("logged-out", null, null, null);
         let message = "Login failed: " + err.message;
         this.dialogueBox.setState("notifying", {message: message}, null);
 
@@ -96,7 +96,7 @@ export class UserAccountUIC extends StatefulElement {
       this.lock.lock(this);
 
       this.extraControls.close(this);
-      this.extraControls.setState("registering", null, this.afterExtraRender, this);
+      this.extraControls.setState("registering", null, this.afterExtraRender, null, this);
       this.extraControls.open(this);
 
       this.lock.unlock(this);
@@ -127,15 +127,15 @@ export class UserAccountUIC extends StatefulElement {
         this.extraControls.close(this);
         this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.setState("logged-in", {currentUserName: currentUser.username});
+        this.setState("logged-in", {currentUserName: currentUser.username}, null, null);
         
       } catch (err) {
         this.extraControls.close(this);
         this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
-        this.setState("logged-out");
+        this.setState("logged-out", null, null, null);
         let message = "Registration failed: " + err.message;
-        this.dialogueBox.setState("notifying", {message: message}, null);
+        this.dialogueBox.setState("notifying", {message: message}, null, null);
 
       } finally {
         this.lock.unlock(this);
@@ -148,11 +148,11 @@ export class UserAccountUIC extends StatefulElement {
 
       try {
         await this.account.logout();
-        this.setState("logged-out");
+        this.setState("logged-out", null, null, null);
 
       } catch (err) {
         let message = "Log out failed: " + err.message;
-        this.dialogueBox.setState("notifying", {message: message}, null);
+        this.dialogueBox.setState("notifying", {message: message}, null, null);
    
       } finally {
         this.lock.unlock(this);
@@ -174,6 +174,8 @@ export class UserAccountUIC extends StatefulElement {
       this.dialogueBox.setState(
         "confirming", 
         {confirmation: "Are you sure you want to log out?"}, 
+        null,
+        null,
         this.submitLogout, 
         this.cancelLogout
       );
@@ -314,16 +316,16 @@ export class UserAccountUIC extends StatefulElement {
       const currentUser = await this.account.check();
 
       if (!currentUser) {
-        this.setState("logged-out");
+        this.setState("logged-out", null, null, null);
       } else {
 
-        this.setState("logged-in", {currentUserName: currentUser.username});
+        this.setState("logged-in", {currentUserName: currentUser.username}, null, null);
       }
 
     } catch (err) {
       //Call to check function failed
       //NEED TO HANDLE ERRORS HERE MORE PROPERLY
-      this.setState("logged-out");
+      this.setState("logged-out", null, null, null);
     }
   
   }
@@ -392,14 +394,14 @@ export class DialogueBoxUIC extends StatefulElement {
     `);
   }
 
-  async setState(state, params, confirmCallback, cancelCallback) {
+  async setState(state, params, afterAfterRender, onStateChange, confirmCallback, cancelCallback) {
 
     await this.#displaySequence.acquire();
 
     this.confirmCallback = confirmCallback;
     this.cancelCallback = cancelCallback;
 
-    super.setState(state, params);
+    super.setState(state, params, afterAfterRender, onStateChange);
 
   }
 
@@ -475,7 +477,7 @@ export class MessageBarUIC extends StatefulElement {
     const myFlashId = ++this.flashCounter;
 
     // Apply the temporary state
-    this.setState(state);
+    this.setState(state, null, null, null);
 
     // Wait
     try {
@@ -486,7 +488,7 @@ export class MessageBarUIC extends StatefulElement {
 
     // Only the latest flash is allowed to revert
     if (myFlashId === this.flashCounter) {
-      this.setState(this.revertState);
+      this.setState(this.revertState, null, null, null);
       this.revertState = null;
     }
   }
@@ -511,7 +513,7 @@ export class OLD_ExtraControlsUIC extends StatefulElement {
     this.isOpen = false;
   }
 
-  async setState(state, params, afterAfterRender) {
+  async setState(state, params, afterAfterRender, onStateChange) {
 
     this.endState = state;
 
@@ -522,10 +524,10 @@ export class OLD_ExtraControlsUIC extends StatefulElement {
       return false;
     }
 
-    super.setState(state, params);
+    super.setState(state, params, afterAfterRender, onStateChange);
 
     try {
-      if (afterAfterRender) {
+      if (afterAfterRender) { 
         afterAfterRender(state);
       }
     } catch(err) {
@@ -603,12 +605,34 @@ export class ExtraControlsUIC extends StatefulElement {
     this.lock = lock;
     this.actionSequence = new AsyncGate();
     this.endState = null;
-    this.isOpen = false;
+    this.isOpen = false; 
+    
+    this.customMode = false;
   }
 
-  async setState(state, params, afterAfterRender, caller) {
+    async setState(state, params, afterAfterRender, onStateChange, caller) {
 
-    this.endState = state;
+      this.endState = state;
+
+      await this.actionSequence.acquire();
+      try {
+
+        if (this.lock.isInterlocked(caller)) {
+          return false;
+        }
+
+        this.customMode = false;
+        super.setState(state, params, afterAfterRender, onStateChange);
+
+      } finally {
+        this.actionSequence.release();
+      }
+    }
+
+
+  async setCustomMode(onStateChange, caller) {
+
+    this.endState = caller;
 
     await this.actionSequence.acquire();
     try {
@@ -617,20 +641,17 @@ export class ExtraControlsUIC extends StatefulElement {
         return false;
       }
 
-      super.setState(state, params);
+      this.customMode = true;
+      this.onStateChange = onStateChange;
+      this.element.innerHTML = ""; 
+      this.currentState = null;
 
-      if (afterAfterRender) {
-        try {
-          afterAfterRender(state);
-        } catch (err) {
-          // swallow to avoid deadlock; caller can log if needed
-        }
-      }
 
     } finally {
       this.actionSequence.release();
     }
   }
+
 
   async clear(caller) {
 
@@ -644,6 +665,7 @@ export class ExtraControlsUIC extends StatefulElement {
         return;
       }
 
+      this.customMode = false;
       super.clear();
 
     } finally {
@@ -718,7 +740,7 @@ export class ModeSelectionUIC extends StatefulElement {
 
 // Define event handlers in class field functions before constructor so we can bind(this) in this constructor
   testShowDialogue = function () {
-    this.dialogueBox.setState("notifying", {message: "DialogueBoxUIC up and running"});
+    this.dialogueBox.setState("notifying", {message: "DialogueBoxUIC up and running"}, null, null);
   }
 
   testOpenExtra = async function () {
@@ -726,7 +748,7 @@ export class ModeSelectionUIC extends StatefulElement {
       this.extraControls.open();
     } else {
       this.extraControls.close();
-      this.extraControls.setState("testing-from-modeSelector", null, this.afterExtraRender);
+      this.extraControls.setState("testing-from-modeSelector", null, this.afterExtraRender, null);
       this.extraControls.open();
     }
   };
@@ -750,29 +772,33 @@ export class ModeSelectionUIC extends StatefulElement {
   };
   
 
-  initiateAddSegment = function () {
+  modeStartAddSegment = function () {
     this.layerSelector.lock();
-    this.mapManager.setMode(new AddSegmentMode());
-    this.setState("segment-adding-a");
+    this.currentMode = new AddSegmentMode(this);
+    this.mapManager.setMode(this.currentMode);
   };
 
-  cancelAddSegment = function () {
-
+  modeCancel = function () {
+    this.currentMode.cancel();
   }
   
-  addSegmentUndoStage = function () {
-
+  modeUndo = function () {
+    this.currentMode.undo()
   }
 
-  confirmAddSegment = function () {     
-  
+  modeConfirm = function () {     
+    confirmation = "Add new segment to the active layer?";
+    this.dialogueBox.setState("confirming", {confirmation: confirmation}, null, null, this.modeConfirmed, null);
   }
 
-  confirmedAddSegment = function () {
-  
+  modeConfirmed = function () {
+    this.currentMode.confirm();
   }
-
-  onModeEnd = function () {
+ 
+  onModeEnded = function (mode) {
+    if(mode === this.currentMode) {
+      this.currentMode = null;
+    }
     this.layerSelector.unlock();
     this.clear();     
   }
@@ -796,10 +822,12 @@ export class ModeSelectionUIC extends StatefulElement {
     this.flashMessageA = this.flashMessageA.bind(this);
     this.flashMessageB = this.flashMessageB.bind(this);
     this.endTest = this.endTest.bind(this);
-    this.initiateAddSegment = this.initiateAddSegment.bind(this);
-    this.cancelAddSegment = this.cancelAddSegment.bind(this);
-    this.addSegmentUndoStage = this.addSegmentUndoStage.bind(this);
-    this.onModeEnd = this.onModeEnd.bind(this);
+    this.modeStartAddSegment = this.modeStartAddSegment.bind(this);
+    this.modeCancel = this.modeCancel.bind(this);i
+    this.modeUndo = this.modeUndo.bind(this);
+    this.modeConfirm = this.modeConfirm.bind(this);
+    this.modeConfirmed = this.modeConfirmed.bind(this);
+    this.onModeEnded = this.onModeEnded.bind(this);
     
     // Bind this for callbacks 
     this.afterExtraRender = this.afterExtraRender.bind(this);
@@ -820,18 +848,18 @@ export class ModeSelectionUIC extends StatefulElement {
 
 
     this.defineState("segment-adding-a",`
-      <button id="cancelAddSegmentBtn">Cancel</button>
+      <button id="modeCancelBtn">Cancel</button>
     `);
 
     this.defineState("segment-adding-b",`
-      <button id="undoAddSegmentStageBtn">Undo</button>
-      <button id="cancelAddSegmentBtn">Cancel</button>
+      <button id="modeUndoBtn">Undo</button>
+      <button id="modeCancelBtn">Cancel</button>
     `);
 
     this.defineState("segment-adding-confirm",`
-      <button id="undoAddSegmentStageBtn">Undo</button>
-      <button id="cancelAddSegmentBtn">Cancel</button>
-      <button id="confirmAddSegmentBtn">Confirm</button>
+      <button id="modeUndoBtn">Undo</button>
+      <button id="modeCancelBtn">Cancel</button>
+      <button id="modeConfirmBtn">Confirm</button>
     `);
 
 
@@ -861,7 +889,7 @@ export class ModeSelectionUIC extends StatefulElement {
 
 
     // INITIATE IN DEFAULT STATE
-    this.setState("segment-selecting");
+    this.setState("segment-selecting", null, null, null);
 
   }
 
@@ -882,20 +910,19 @@ export class ModeSelectionUIC extends StatefulElement {
         this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
       break;
 
-      case "segment-selecting":
-        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
-      break;
-
       case "segment-adding-a":
-        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel();
       break;
 
       case "segment-adding-b":
-        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel();
+        this.element.querySelector("#modeUndoBtn").onclick = this.modeUndo(); 
       break;
 
       case "segment-adding-confirm":
-        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel();
+        this.element.querySelector("#modeUndoBtn").onclick = this.modeUndo(); 
+        this.element.querySelector("#modeConfirmBtn").onclick = this.modeConfirm();  
       break;
 
       default:
@@ -924,7 +951,7 @@ export class ModeSelectionUIC extends StatefulElement {
   
   clear() {
     // Overridden to effect a default state
-    this.setState(this.defaultState);
+    this.setState(this.defaultState, null, null, null);
 
   }
   
@@ -951,7 +978,7 @@ export class MapManagerUIC {
     this.currentMode = null;
 
     this.map = null;
-    this.baseLayer = null
+    this.baseLayer = null;
     this.networkLayerStack = new NetworkLayerStack();
     this.mapUILayer = new MapUILayer();
 
@@ -1022,3 +1049,604 @@ export class MapManagerUIC {
 
 }
 
+
+
+
+
+
+
+
+//---------------------------------------------------------------
+
+
+
+
+
+
+
+
+class LayerSelectorUIC {
+
+    constructor(element, messageBar, dialogueBox, extraControls, mapManager, lock, currentUser) {
+        this.element = element;
+        this.messageBar = messageBar;
+        this.dialogueBox = dialogueBox;
+        this.extraControls = extraControls;
+        this.mapManager = mapManager;
+        this.lock = lock;
+        this.currentUser = currentUser;
+
+        this.ownsTheExtraControlsState = false;
+        this.showRemoveButtons = false;
+
+        this.availableLayers = {};
+        this.schemas = {};
+
+        this.nextLayerId = 1;
+        this.nextSchemaId = 1;
+
+        this.onExtraStateChange = this.onExtraStateChange.bind(this);
+        this._onClick = this._onClick.bind(this);
+        this._onChange = this._onChange.bind(this); 
+
+        this.element.addEventListener("click", this._onClick);
+        this.element.addEventListener("change", this._onChange);
+    }
+
+
+    init() {
+        // TEMPORARY: until server integration exists
+        var schemaId = this.nextSchemaId++;
+        var schema = new RenderingSchema(schemaId, "New Layer", this.currentUser);
+        this.schemas[schemaId] = schema;
+
+        var layerId = this.nextLayerId++;
+        var layer = new NetworkLayer(layerId, "New Layer", this.currentUser);
+        layer.setRenderingSchema(schema);
+
+        this.mapManager.networkLayerStack.addLayer(layer);
+
+        this.render();
+        
+        this.layerListElement = this.element.querySelector(".layer-list");
+        this.manageLayersButton = this.element.querySelector(".manage-layers");
+        this.manageSchemasButton = this.element.querySelector(".manage-schemas");
+
+        this.manageLayersButton.addEventListener("click", this._openManageLayers.bind(this));
+        this.manageSchemasButton.addEventListener("click", this._openManageSchemas.bind(this));
+
+    }
+
+
+    render() {
+        this.layerListElement.innerHTML = "";
+
+        var layers = this.mapManager.networkLayerStack.getOrderedLayers();
+        var i, layer, row;
+
+        for (i = 0; i < layers.length; i++) {
+            layer = layers[i];
+            row = this._buildLayerRow(layer, i, layers.length);
+            this.layerListElement.appendChild(row);
+        }
+
+        if (this.lock.isInterlocked()) {
+            this.element.classList.add("greyed-out");
+        } else {
+            this.element.classList.remove("greyed-out");
+        }
+
+        if (this.showRemoveButtons) {
+            this.element.classList.add("removal-mode");
+        } else {
+            this.element.classList.remove("removal-mode");
+        }
+    }
+
+
+    _buildLayerRow(layer, index, total) {
+        var row = document.createElement("div");
+        row.className = "layer-row";
+        row.dataset.layerId = layer.id;
+
+        if (this.showRemoveButtons) {
+            var removeBtn = document.createElement("button");
+            removeBtn.className = "remove-layer";
+            removeBtn.textContent = "◀";
+            row.appendChild(removeBtn);
+        }
+
+        var vis = document.createElement("input");
+        vis.type = "checkbox";
+        vis.className = "visibility-toggle";
+        vis.checked = this.mapManager.networkLayerStack.isVisible(layer.id);
+        row.appendChild(vis);
+
+        if (layer.isOwnedBy(this.currentUser)) {
+            var nameInput = document.createElement("input");
+            nameInput.className = "layer-name-input";
+            nameInput.value = layer.getName();
+            row.appendChild(nameInput);
+        } else {
+            var nameSpan = document.createElement("span");
+            nameSpan.className = "layer-name";
+            nameSpan.textContent = layer.getName();
+            row.appendChild(nameSpan);
+        }
+
+        var schemaSelect = document.createElement("select");
+        schemaSelect.className = "schema-selector";
+        this._populateSchemaSelect(schemaSelect, layer.getRenderingSchema());
+        row.appendChild(schemaSelect);
+
+        var moveBox = document.createElement("div");
+        moveBox.className = "move-buttons";
+
+        var upBtn = document.createElement("button");
+        upBtn.className = "move-up";
+        upBtn.textContent = "▲";
+        if (index === 0) upBtn.disabled = true;
+        moveBox.appendChild(upBtn);
+
+        var downBtn = document.createElement("button");
+        downBtn.className = "move-down";
+        downBtn.textContent = "▼";
+        if (index === total - 1) downBtn.disabled = true;
+        moveBox.appendChild(downBtn);
+
+        row.appendChild(moveBox);
+
+        return row;
+    }
+
+
+    _populateSchemaSelect(select, currentSchema) {
+        var ids = Object.keys(this.schemas);
+        var i, id, s, opt;
+
+        for (i = 0; i < ids.length; i++) {
+            id = ids[i];
+            s = this.schemas[id];
+
+            opt = document.createElement("option");
+            opt.value = s.id;
+            opt.textContent = s.getName();
+            if (currentSchema && s.id === currentSchema.id) opt.selected = true;
+            select.appendChild(opt);
+        }
+    }
+
+
+    _onClick(e) {
+        if (this.lock.isInterlocked()) {
+            this.render();
+            return;
+        }
+
+        var row = e.target.closest(".layer-row");
+        var layerId, layer;
+
+        if (row) {
+            layerId = parseInt(row.dataset.layerId, 10);
+            layer = this.mapManager.networkLayerStack.getLayer(layerId);
+
+            if (e.target.classList.contains("remove-layer")) {
+                this.mapManager.networkLayerStack.removeLayer(layerId);
+                this.availableLayers[layerId] = layer;
+                this.render();
+                this._refreshManageLayersDrawerIfOpen();
+                return;
+            }
+
+            if (e.target.classList.contains("move-up")) {
+                this.mapManager.networkLayerStack.moveLayerUp(layerId);
+                this.render();
+                return;
+            }
+
+            if (e.target.classList.contains("move-down")) {
+                this.mapManager.networkLayerStack.moveLayerDown(layerId);
+                this.render();
+                return;
+            }
+        }
+    }
+
+
+    _onChange(e) {
+        if (this.lock.isInterlocked()) {
+            this.render();
+            return;
+        }
+
+        var row = e.target.closest(".layer-row");
+        var layerId, layer;
+
+        if (row) {
+            layerId = parseInt(row.dataset.layerId, 10);
+            layer = this.mapManager.networkLayerStack.getLayer(layerId);
+
+            if (e.target.classList.contains("visibility-toggle")) {
+                this.mapManager.networkLayerStack.setVisible(layerId, e.target.checked);
+                return;
+            }
+            
+            if (e.target.classList.contains("layer-name-input")) {
+                layer.setName(e.target.value);
+                this.render();
+                return;
+            }
+
+            if (e.target.classList.contains("schema-selector")) {
+                var schema = this.schemas[e.target.value];
+                layer.setRenderingSchema(schema);
+                return;
+            }
+        }
+    }
+
+
+    async _openManageLayers() {
+        await this.extraControls.close();
+
+        var ok = await this.extraControls.setCustomMode(this.onExtraStateChange);
+        if (!ok) return;
+
+        this.ownsTheExtraControlsState = true;
+
+        await this.extraControls.open();
+
+        this.showRemoveButtons = true;
+        this.render();
+
+        var container = this.extraControls.getElement();
+
+        var header = document.createElement("div");
+        header.className = "drawer-header";
+
+        var newBtn = document.createElement("button");
+        newBtn.className = "new-layer";
+        newBtn.textContent = "New Layer";
+        header.appendChild(newBtn);
+
+        var doneBtn = document.createElement("button");
+        doneBtn.className = "done";
+        doneBtn.textContent = "Done";
+        header.appendChild(doneBtn);
+
+        container.appendChild(header);
+
+        var title = document.createElement("h2");
+        title.textContent = "Available Layers";
+        container.appendChild(title);
+
+        var list = document.createElement("div");
+        list.className = "available-layers-list scrollable";
+        container.appendChild(list);
+
+        this._renderAvailableLayersList(list);
+
+        newBtn.addEventListener("click", this._handleNewLayer.bind(this));
+        doneBtn.addEventListener("click", this._handleDoneLayers.bind(this));
+
+        list.addEventListener("click", this._handleManageLayersClick.bind(this));
+        list.addEventListener("change", this._handleManageLayersChange.bind(this));
+    }
+
+
+    _renderAvailableLayersList(list) {
+        list.innerHTML = "";
+
+        var ids = Object.keys(this.availableLayers);
+        var i, id, layer, row;
+
+        for (i = 0; i < ids.length; i++) {
+            id = ids[i];
+            layer = this.availableLayers[id];
+            row = this._buildAvailableLayerRow(layer);
+            list.appendChild(row);
+        }
+    }
+
+
+    _buildAvailableLayerRow(layer) {
+        var row = document.createElement("div");
+        row.className = "available-layer-row";
+        row.dataset.layerId = layer.id;
+
+        if (layer.isOwnedBy(this.currentUser)) {
+            var nameInput = document.createElement("input");
+            nameInput.className = "layer-name-input";
+            nameInput.value = layer.getName();
+            row.appendChild(nameInput);
+        } else {
+            var nameSpan = document.createElement("span");
+            nameSpan.className = "layer-name";
+            nameSpan.textContent = layer.getName();
+            row.appendChild(nameSpan);
+        }
+
+        var addBtn = document.createElement("button");
+        addBtn.className = "add-layer";
+        addBtn.textContent = "▶";
+        row.appendChild(addBtn);
+
+        return row;
+    }
+
+
+    _handleManageLayersChange(e) {
+        var row = e.target.closest(".available-layer-row");
+        if (!row) return;
+
+        var layerId = parseInt(row.dataset.layerId, 10);
+        var layer = this.availableLayers[layerId];
+
+        if (e.target.classList.contains("layer-name-input")) {
+            layer.setName(e.target.value);
+        }
+    }
+
+
+    _handleManageLayersClick(e) {
+        var row = e.target.closest(".available-layer-row");
+        if (!row) return;
+
+        var layerId = parseInt(row.dataset.layerId, 10);
+        var layer = this.availableLayers[layerId];
+
+        if (e.target.classList.contains("add-layer")) {
+            this.mapManager.networkLayerStack.addLayer(layer);
+            delete this.availableLayers[layerId];
+            this.render();
+            this._refreshManageLayersDrawerIfOpen();
+        }
+    }
+
+
+    _refreshManageLayersDrawerIfOpen() {
+        if (!this.ownsTheExtraControlsState) return;
+
+        var container = this.extraControls.getElement();
+        var list = container.querySelector(".available-layers-list");
+        if (list) this._renderAvailableLayersList(list);
+    }
+
+
+    _handleNewLayer() {
+        var stack = this.mapManager.networkLayerStack;
+
+        if (stack.getOrderedLayers().length >= 3) {
+            this.dialogueBox.setState("notifying", {
+                message: "You can only have up to three layers in the stack."
+            });
+            return;
+        }
+
+        var schemaId = this.nextSchemaId++;
+        var schema = new RenderingSchema(schemaId, "New Layer", this.currentUser);
+        this.schemas[schemaId] = schema;
+
+        var layerId = this.nextLayerId++;
+        var layer = new NetworkLayer(layerId, "New Layer", this.currentUser);
+        layer.setRenderingSchema(schema);
+
+        stack.addLayer(layer);
+        this.render();
+    }
+
+
+    _handleDoneLayers() {
+        this.extraControls.clear();
+    }
+
+
+    async _openManageSchemas() {
+        await this.extraControls.close();
+
+        var ok = await this.extraControls.setCustomMode(this.onExtraStateChange);
+        if (!ok) return;
+
+        this.ownsTheExtraControlsState = true;
+
+        await this.extraControls.open();
+
+        var container = this.extraControls.getElement();
+
+        var header = document.createElement("div");
+        header.className = "schema-header";
+
+        var label = document.createElement("label");
+        label.textContent = "Manage schema:";
+        label.setAttribute("for", "schema-picker");
+        header.appendChild(label);
+
+        var picker = document.createElement("select");
+        picker.id = "schema-picker";
+        picker.className = "schema-picker";
+        header.appendChild(picker);
+
+        var newBtn = document.createElement("button");
+        newBtn.className = "new-schema";
+        newBtn.textContent = "New Schema";
+        header.appendChild(newBtn);
+
+        var doneBtn = document.createElement("button");
+        doneBtn.className = "done";
+        doneBtn.textContent = "Done";
+        header.appendChild(doneBtn);
+
+        container.appendChild(header);
+
+        var editor = document.createElement("div");
+        editor.className = "schema-editor";
+
+        var h3 = document.createElement("h3");
+        h3.textContent = "Schema Settings";
+        editor.appendChild(h3);
+        
+        var nameLabel = document.createElement("label");
+        nameLabel.textContent = "Schema Name:";
+        editor.appendChild(nameLabel);
+
+        var nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "schema-name-input";
+        editor.appendChild(nameInput);
+
+        var colourLabel = document.createElement("label");
+        colourLabel.textContent = "Default Colour:";
+        editor.appendChild(colourLabel);
+
+        var colourInput = document.createElement("input");
+        colourInput.type = "color";
+        colourInput.className = "schema-colour-picker";
+        editor.appendChild(colourInput);
+
+        var weightLabel = document.createElement("label");
+        weightLabel.textContent = "Default Weight:";
+        editor.appendChild(weightLabel);
+
+        var weightInput = document.createElement("input");
+        weightInput.type = "number";
+        weightInput.className = "schema-weight-input";
+        editor.appendChild(weightInput);
+
+        container.appendChild(editor);
+
+        this._populateSchemaPicker(picker);
+
+        picker.addEventListener("change", this._handleSchemaPickerChange.bind(this));
+        newBtn.addEventListener("click", this._handleNewSchema.bind(this));
+        doneBtn.addEventListener("click", this._handleDoneSchemas.bind(this));
+        
+        nameInput.addEventListener("change", this._handleSchemaNameChange.bind(this));
+        colourInput.addEventListener("change", this._handleSchemaColourChange.bind(this));
+        weightInput.addEventListener("change", this._handleSchemaWeightChange.bind(this));
+
+        this._loadSchemaIntoEditor(picker.value);
+    }
+
+
+    _populateSchemaPicker(picker) {
+        picker.innerHTML = "";
+
+        var ids = Object.keys(this.schemas);
+        var i, id, s, opt;
+
+        for (i = 0; i < ids.length; i++) {
+            id = ids[i];
+            s = this.schemas[id];
+
+            opt = document.createElement("option");
+            opt.value = s.id;
+            opt.textContent = s.getName();
+            picker.appendChild(opt);
+        }
+    }
+
+
+    _handleSchemaPickerChange(e) {
+        this._loadSchemaIntoEditor(e.target.value);
+    }
+
+
+    _loadSchemaIntoEditor(schemaId) {
+        var schema = this.schemas[schemaId];
+        if (!schema) return;
+        
+        var container = this.extraControls.getElement();
+
+        var nameInput = container.querySelector(".schema-name-input");
+        var colourInput = container.querySelector(".schema-colour-picker");
+        var weightInput = container.querySelector(".schema-weight-input");
+
+        nameInput.value = schema.getName();
+        colourInput.value = schema.getDefaultColour();
+        weightInput.value = schema.getDefaultWeight();
+    }
+
+
+    _handleNewSchema() {
+        var schemaId = this.nextSchemaId++;
+        var schema = new RenderingSchema(schemaId, "New Schema", this.currentUser);
+        this.schemas[schemaId] = schema;
+
+        var picker = this.extraControls.getElement().querySelector(".schema-picker");
+        this._populateSchemaPicker(picker);
+        picker.value = schemaId;
+
+        this._loadSchemaIntoEditor(schemaId);
+    }
+
+
+    _handleDoneSchemas() {
+        this.extraControls.clear();
+    }
+
+
+    _handleSchemaNameChange(e) {
+        var picker = this.extraControls.getElement().querySelector(".schema-picker");
+        var schema = this.schemas[picker.value];
+
+        schema.setName(e.target.value);
+
+        // Update the picker text so the new name appears immediately
+        this._populateSchemaPicker(picker);
+        picker.value = schema.id;
+
+        // Layers using this schema should update their display names
+        this.render();
+    }
+
+
+    _handleSchemaColourChange(e) {
+        var picker = this.extraControls.getElement().querySelector(".schema-picker");
+        var schema = this.schemas[picker.value];
+        schema.setDefaultColour(e.target.value);
+        this.mapManager.networkLayerStack.refreshLayersThatUseSchema(schema.id);
+    }
+
+
+    _handleSchemaWeightChange(e) {
+        var picker = this.extraControls.getElement().querySelector(".schema-picker");
+        var schema = this.schemas[picker.value];
+
+        var v = parseInt(e.target.value, 10);
+        if (isNaN(v) || v <= 0) {
+            e.target.value = schema.getDefaultWeight();
+            return;
+        }
+
+        schema.setDefaultWeight(v);
+        this.mapManager.networkLayerStack.refreshLayersThatUseSchema(schema.id);            
+    }
+
+
+    onExtraStateChange() {
+        this.ownsTheExtraControlsState = false;
+        this.showRemoveButtons = false;
+        this.render();
+    }
+
+
+    lock(caller) {
+        this.lock.lock(caller);
+        this.element.classList.add("greyed-out");
+
+        if (this.ownsTheExtraControlsState) {
+            this.extraControls.clear();
+        }
+    }
+
+
+    unlock(caller) {
+        this.lock.unlock(caller);
+        this.element.classList.remove("greyed-out");
+    }
+
+
+    isInterlocked() {
+        return this.lock.isInterlocked();
+    }
+}

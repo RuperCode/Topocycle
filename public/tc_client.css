@@ -138,3 +138,143 @@ body {
   flex: 1;
 }
 
+
+
+
+/* ================================
+   CORE FLEX LAYOUT - LAYER SELECTOR
+   ================================ */
+
+.layer-row,
+.available-layer-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.move-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.layer-selector-controls {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+}
+
+
+/* ================================
+   MAIN PANEL
+   ================================ */
+
+.layer-selector-uic {
+    display: flex;
+    flex-direction: column;
+}
+
+.layer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.layer-name-input {
+    width: 120px;
+}
+
+.schema-selector {
+    width: 120px;
+}
+
+
+/* ================================
+   REMOVE BUTTON VISIBILITY
+   ================================ */
+
+.layer-selector-uic .remove-layer {
+    display: none;
+}
+
+.layer-selector-uic.removal-mode .remove-layer {
+    display: inline-block;
+}
+
+
+/* ================================
+   GREYED OUT STATE
+   ================================ */
+
+.layer-selector-uic.greyed-out {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+
+/* ================================
+   DRAWER: MANAGE LAYERS
+   ================================ */
+
+.manage-layers-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.drawer-header {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.available-layers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.scrollable {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+
+/* ================================
+   DRAWER: MANAGE SCHEMAS
+   ================================ */
+
+.manage-schemas-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.schema-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.schema-editor {
+    border-top: 1px solid #ccc;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.schema-editor label {
+    font-size: 0.9em;
+}
+
+.schema-colour-picker {
+    width: 60px;
+}
+
+.schema-weight-input {
+    width: 60px;
+}
+
+

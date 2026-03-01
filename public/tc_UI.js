@@ -1075,12 +1075,15 @@ class LayerSelectorUIC {
         this.mapManager = mapManager;
         this.lock = lock;
         this.currentUser = currentUser;
+  
 
         this.ownsTheExtraControlsState = false;
         this.showRemoveButtons = false;
 
         this.availableLayers = {};
         this.schemas = {};
+
+        this.maxLayers = 3;
 
         this.nextLayerId = 1;
         this.nextSchemaId = 1;
@@ -1354,6 +1357,11 @@ class LayerSelectorUIC {
         row.className = "available-layer-row";
         row.dataset.layerId = layer.id;
 
+        var delBtn = document.createElement("button");
+        delBtn.className = "delete-layer";
+        delBtn.textContent = "✖";
+        row.appendChild(delBtn);
+
         if (layer.isOwnedBy(this.currentUser)) {
             var nameInput = document.createElement("input");
             nameInput.className = "layer-name-input";
@@ -1396,10 +1404,30 @@ class LayerSelectorUIC {
         var layer = this.availableLayers[layerId];
 
         if (e.target.classList.contains("add-layer")) {
-            this.mapManager.networkLayerStack.addLayer(layer);
+            var stack = this.mapManager.networkLayerStack;
+            if (stack.getOrderedLayers().length >= this.maxLayers) {
+                this.dialogueBox.setState("notifying", {message: "You can only have up to three layers on the map at a time."});
+                return;
+            }
+        
+            stack.addLayer(layer);
             delete this.availableLayers[layerId];
             this.render();
-            this._refreshManageLayersDrawerIfOpen();
+            this._refreshManageLayersDrawerIfOpen()
+            return;
+        }
+        
+        if (e.target.classList.contains("delete-layer")) {
+            //add functionality for shared layers
+            this.dialogueBox.setState("confirming", {confirmation: "Delete this layer permanently?"}, onConfirm() => {
+                delete this.availableLayers[layerId];
+
+                // placeholder for server call
+                // server.deleteLayer(layerId);
+
+                this._refreshManageLayersDrawerIfOpen();
+            });
+            return;
         }
     }
 
@@ -1416,9 +1444,9 @@ class LayerSelectorUIC {
     _handleNewLayer() {
         var stack = this.mapManager.networkLayerStack;
 
-        if (stack.getOrderedLayers().length >= 3) {
+        if (stack.getOrderedLayers().length >= this.maxLayers) {
             this.dialogueBox.setState("notifying", {
-                message: "You can only have up to three layers in the stack."
+                message: "You can only have up to three layers on the map at a time."
             });
             return;
         }
@@ -1465,6 +1493,11 @@ class LayerSelectorUIC {
         picker.id = "schema-picker";
         picker.className = "schema-picker";
         header.appendChild(picker);
+
+        var deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-schema";
+        deleteBtn.textContent = "Delete";
+        header.appendChild(deleteBtn);
 
         var newBtn = document.createElement("button");
         newBtn.className = "new-schema";
@@ -1517,6 +1550,7 @@ class LayerSelectorUIC {
         this._populateSchemaPicker(picker);
 
         picker.addEventListener("change", this._handleSchemaPickerChange.bind(this));
+        deleteBtn.addEventListener("click", this._handleDeleteSchema.bind(this));
         newBtn.addEventListener("click", this._handleNewSchema.bind(this));
         doneBtn.addEventListener("click", this._handleDoneSchemas.bind(this));
         
@@ -1582,6 +1616,32 @@ class LayerSelectorUIC {
 
     _handleDoneSchemas() {
         this.extraControls.clear();
+    }
+
+
+    _handleDeleteSchema() {
+        var picker = this.extraControls.getElement().querySelector(".schema-picker");
+        var schemaId = picker.value;
+
+        this.dialogueBox.setState("confirming", {confirmation: "Delete this schema permanently?"}, onConfirm() => {
+            delete this.schemas[schemaId];
+
+            // placeholder for server call
+            // server.deleteSchema(schemaId);
+
+            this._populateSchemaPicker(picker);
+
+            // If no schemas left, clear editor
+            if (picker.options.length === 0) {
+                this.extraControls.clear();
+                return;
+            }
+
+            picker.value = picker.options[0].value;
+            this._loadSchemaIntoEditor(picker.value);
+
+            this.render(); // update layer list schema dropdowns
+        });
     }
 
 

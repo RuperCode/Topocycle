@@ -65,15 +65,16 @@ export class Segment {
 
 export class NetworkLayer {
 
-    constructor(id = null, name = "New Schema", owner = null) {
+    constructor(id = null, name = "New Schema", ownerID = null) {
         this.id = id;
         this.name = name;
-        this.owner = owner;
+        this.ownerID = ownerID;
 
         this.junctions = {};   // id → Junction
         this.segments = {};    // id → Segment
 
         this.leaflet = L.layerGroup();
+        this.junctionLayer = L.layerGroup(); 
         
         this.renderingSchema = null;
 
@@ -82,6 +83,10 @@ export class NetworkLayer {
         this._segmentIdCounter = 1;
     }
     
+    getJunctionLayer() {
+        return this.junctionLayer;        
+    }
+
     setRenderingSchema(schema) {
         this.renderingSchema = schema;
         this.rebuildAllPolylines();
@@ -102,7 +107,7 @@ export class NetworkLayer {
     
 
     isOwnedBy(userID) {
-        return (this.owner === userID);
+        return (this.ownerID === userID);
     }
 
 
@@ -116,6 +121,20 @@ export class NetworkLayer {
         const id = this._junctionIdCounter++;
         const j = new Junction(id, lat, lng);
         this.junctions[id] = j;
+
+        // Invisible but hit-testable marker
+        const m = L.circleMarker([lat, lng], {
+            radius: 8,
+            color: '#000000',
+            opacity: 0,
+            fillOpacity: 0,
+            weight: 0,
+            interactive: true
+        });
+
+        j._marker = m;
+        this.junctionLayer.addLayer(m);
+        
         return id;
     }
 
@@ -412,10 +431,12 @@ export class MapUILayer {
 
     constructor() {
         // The root Leaflet layer group that MapManagerUIC will add to the map
-        this.leaflet = L.layerGroup();
+        this.leaflet = L.layerGroup([], {interactive: false});
+
 
         // Internal references to UI elements
-        this._crosshair = null;
+        this._crosshairA = null;
+        this._crosshairB = null;
         this._rubberband = null;
         this._hoverMarker = null;
         this._highlight = null;
@@ -431,12 +452,12 @@ export class MapUILayer {
     // -------------------------------------------------------------
     // Crosshair
     // -------------------------------------------------------------
-    setCrosshair(lat, lng, options = {}) {
-        if (this._crosshair) {
-            this.leaflet.removeLayer(this._crosshair);
+    setCrosshairA(lat, lng, options = {}) {
+        if (this._crosshairA) {
+            this.leaflet.removeLayer(this._crosshairA);
         }
 
-        this._crosshair = L.circleMarker([lat, lng], {
+        this._crosshairA = L.circleMarker([lat, lng], {
             radius: 6,
             color: options.color || 'red',
             weight: 2,
@@ -444,15 +465,39 @@ export class MapUILayer {
             ...options
         });
 
-        this._crosshair.addTo(this.leaflet);
+        this._crosshairA.addTo(this.leaflet);
     }
 
-    clearCrosshair() {
-        if (this._crosshair) {
-            this.leaflet.removeLayer(this._crosshair);
-            this._crosshair = null;
+    clearCrosshairA() {
+        if (this._crosshairA) {
+            this.leaflet.removeLayer(this._crosshairA);
+            this._crosshairA = null;
         }
     }
+
+    setCrosshairB(lat, lng, options = {}) {
+        if (this._crosshairB) {
+            this.leaflet.removeLayer(this._crosshairB);
+        }
+
+        this._crosshairB = L.circleMarker([lat, lng], {
+            radius: 6,
+            color: options.color || 'red',
+            weight: 2,
+            fillOpacity: 0,
+            ...options
+        });
+
+        this._crosshairB.addTo(this.leaflet);
+    }
+
+    clearCrosshairB() {
+        if (this._crosshairB) {
+            this.leaflet.removeLayer(this._crosshairB);
+            this._crosshairB = null;
+        }
+    }
+
 
     // -------------------------------------------------------------
     // Rubberband line (dragging, measuring, drawing)
@@ -543,7 +588,8 @@ export class MapUILayer {
     // -------------------------------------------------------------
     clearAll() {
         this.leaflet.clearLayers();
-        this._crosshair = null;
+        this._crosshairA = null;
+        this._crosshairB = null;
         this._rubberband = null;
         this._hoverMarker = null;
         this._highlight = null;
@@ -569,6 +615,7 @@ export class RenderingSchema {
     
     constructor(id = null, name = "New Schema", owner = null) {
         this.id = id;
+        this.name = name;
         this.owner = owner;
         this.defaultColour = '#3388ff';  
         this.defaultWeight = 4;
@@ -597,7 +644,7 @@ export class RenderingSchema {
     }
     
     getDefaultColour() {
-        return defaultColour;
+        return this.defaultColour;
     }
 
 
@@ -606,14 +653,14 @@ export class RenderingSchema {
     }
     
     getDefaultWeight() {
-        return defaultWeight;
+        return this.defaultWeight;
     }
 
 
     resolveSegmentStyle(segment) {
         return {
-            color: defaultColour,
-            weight: defaultWeight
+            color: this.defaultColour,
+            weight: this.defaultWeight
         };
     } 
 

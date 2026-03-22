@@ -1,6 +1,7 @@
 import { StatefulElement, AsyncGate } from './tc_tools.js';
-import { Junction, Segment, NetworkLayer, NetworkLayerStack, MapUILayer } from './tc_mapping.js';
-import { wait, waitForTransition} from './tc_tools.js';
+import { Junction, Segment, NetworkLayer, NetworkLayerStack, MapUILayer, RenderingSchema } from './tc_mapping.js';
+import { wait, waitForTransition } from './tc_tools.js';
+import { AddSegmentMode } from './tc_mmmodes.js';
 
 
 export class UserAccountUIC extends StatefulElement {
@@ -10,21 +11,21 @@ export class UserAccountUIC extends StatefulElement {
   messageBar;
   dialogueBox; 
   extraControls;
-  lock;
+  _interlock;
   account;
+  _currentUserID
 
     authenticate = async function() {
 
-      if (this.lock.isLocked()) return;
+      if (this.isLocked()) return;
 
-      this.lock.lock(this);
+      this.lock(this);
 
       this.extraControls.close();
-      this.extraControls.setState("logging-in", null, this.afterExtraRender, null);
+      this.extraControls.setState("logging-in", null, this.afterExtraRender, null, this);
 
       try {
         await this.extraControls.open();
-
         if(this.extraControls.getState() === "logging-in"){
           this.extraControls.lock.lock(this); 
           this.setState("authenticating", null, null, null);
@@ -37,24 +38,23 @@ export class UserAccountUIC extends StatefulElement {
         this.messageBar.flashState("login-unavailable");
         this.extraControls.lock.unlock(this); 
       } finally {
-        this.lock.unlock(this);
+        this.unlock(this);
       }
 
     };
 
 
     cancelAuthentication = function() {
-
-      
-      if (this.lock.isLocked()) return;
-      this.lock.lock(this);
+  
+      if (this.isLocked()) return;
+      this.lock(this);
 
       this.extraControls.close(this);
       this.extraControls.clear(this);
       this.extraControls.lock.unlock(this);  
-      this.setState("logged-out");
+      this.setState("logged-out", null, null, null);
 
-      this.lock.unlock(this);
+      this.unlock(this);
 
     };
 
@@ -63,8 +63,8 @@ export class UserAccountUIC extends StatefulElement {
 
     submitLogin = async function() {
 
-      if (this.lock.isLocked()) return;
-      this.lock.lock(this);
+      if (this.isLocked()) return;
+      this.lock(this);
 
       const identifier = this.extraControls.element.querySelector("#identifier").value;
       const password = this.extraControls.element.querySelector("#password").value;
@@ -74,6 +74,7 @@ export class UserAccountUIC extends StatefulElement {
         this.extraControls.close(this);
         this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
+        this._currentUserID = currentUser.id;
         this.setState("logged-in", {currentUserName: currentUser.username}, null, null);
     
       } catch (err) {
@@ -82,24 +83,24 @@ export class UserAccountUIC extends StatefulElement {
         this.extraControls.lock.unlock(this);
         this.setState("logged-out", null, null, null);
         let message = "Login failed: " + err.message;
-        this.dialogueBox.setState("notifying", {message: message}, null);
+        this.dialogueBox.setState("notifying", {message: message}, null, null);
 
       } finally {
-        this.lock.unlock(this);
+        this.unlock(this);
       }
 
     };
 
     register = function() {
 
-      if (this.lock.isLocked()) return;
-      this.lock.lock(this);
+      if (this.isLocked()) return;
+      this.lock(this);
 
       this.extraControls.close(this);
       this.extraControls.setState("registering", null, this.afterExtraRender, null, this);
       this.extraControls.open(this);
 
-      this.lock.unlock(this);
+      this.unlock(this);
 
     };
 
@@ -119,14 +120,15 @@ export class UserAccountUIC extends StatefulElement {
         return;
       }
 
-      if (this.lock.isLocked()) return;
-      this.lock.lock(this);
+      if (this.isLocked()) return;
+      this.lock(this);
 
       try {
         const currentUser = await this.account.register(username, email, password);
         this.extraControls.close(this);
         this.extraControls.clear(this);
         this.extraControls.lock.unlock(this);
+        this._currentUserID = currentUser.id;
         this.setState("logged-in", {currentUserName: currentUser.username}, null, null);
         
       } catch (err) {
@@ -138,7 +140,7 @@ export class UserAccountUIC extends StatefulElement {
         this.dialogueBox.setState("notifying", {message: message}, null, null);
 
       } finally {
-        this.lock.unlock(this);
+        this.unlock(this);
       }
 
     };
@@ -148,6 +150,7 @@ export class UserAccountUIC extends StatefulElement {
 
       try {
         await this.account.logout();
+        this._currentUserID = null;
         this.setState("logged-out", null, null, null);
 
       } catch (err) {
@@ -155,21 +158,21 @@ export class UserAccountUIC extends StatefulElement {
         this.dialogueBox.setState("notifying", {message: message}, null, null);
    
       } finally {
-        this.lock.unlock(this);
+        this.unlock(this);
       }
       
     };
 
 
     cancelLogout = async function() {
-      this.lock.unlock(this);
+      this.unlock(this);
     };
 
 
     logout = function() {
 
-      if (this.lock.isLocked()) return;
-      this.lock.lock(this);
+      if (this.isLocked()) return;
+      this.lock(this);
 
       this.dialogueBox.setState(
         "confirming", 
@@ -181,14 +184,16 @@ export class UserAccountUIC extends StatefulElement {
       );
     };
 
-  constructor(element, messageBar, dialogueBox, extraControls, lock, account) {
+  constructor(element, messageBar, dialogueBox, extraControls, interlock, account) {
     super(element);
 
     this.messageBar = messageBar;
     this.dialogueBox = dialogueBox; 
     this.extraControls = extraControls;
-    this.lock = lock;
+    this._interlock = interlock;
     this.account = account;
+
+    this._currentUserID = null;
 
  // Bind(this) for the event handlers so that they can be used as such a know about 'this'
 
@@ -197,10 +202,11 @@ export class UserAccountUIC extends StatefulElement {
     this.logout = this.logout.bind(this);
     this.submitLogin = this.submitLogin.bind(this);
     this.submitRegistration = this.submitRegistration.bind(this);
-    this.submitLogout= this.submitLogout.bind(this);
+    this.submitLogout = this.submitLogout.bind(this);
     this.cancelAuthentication = this.cancelAuthentication.bind(this);
     this.cancelLogout = this.cancelLogout.bind(this);
     this.afterExtraRender = this.afterExtraRender.bind(this)
+    this.getCurrentUserID = this.getCurrentUserID.bind(this);
 
 
     // Define the fixed HTML states for this UIC
@@ -286,7 +292,6 @@ export class UserAccountUIC extends StatefulElement {
   }
 
   afterExtraRender(state) {
-  
     // Create event handling for the defined states of this UIC in addition to setting the HTML state in the super class
     switch (state) {
 
@@ -318,7 +323,7 @@ export class UserAccountUIC extends StatefulElement {
       if (!currentUser) {
         this.setState("logged-out", null, null, null);
       } else {
-
+        this._currentUserID = currentUser.id;
         this.setState("logged-in", {currentUserName: currentUser.username}, null, null);
       }
 
@@ -330,7 +335,29 @@ export class UserAccountUIC extends StatefulElement {
   
   }
 
+  getCurrentUserID() {
+      return this._currentUserID;
+  }
+
+  lock(caller) {
+      this._interlock.lock(caller);
+  }
+
+
+  unlock(caller) {
+      this._interlock.unlock(caller);
+  }
+
+  isLocked() {
+      return this._interlock.isLocked();
+  }
+
+  isInterlocked() {
+      return this._interlock.isInterlocked();
+  }
+
 }
+
 
 
 
@@ -735,7 +762,7 @@ export class ExtraControlsUIC extends StatefulElement {
 
 
 
-export class ModeSelectionUIC extends StatefulElement {
+export class ModeSelectorUIC extends StatefulElement {
 
 
 // Define event handlers in class field functions before constructor so we can bind(this) in this constructor
@@ -748,7 +775,7 @@ export class ModeSelectionUIC extends StatefulElement {
       this.extraControls.open();
     } else {
       this.extraControls.close();
-      this.extraControls.setState("testing-from-modeSelector", null, this.afterExtraRender, null);
+      this.extraControls.setState("testing-from-modeSelector", null, this.afterExtraRender, null, this);
       this.extraControls.open();
     }
   };
@@ -773,7 +800,8 @@ export class ModeSelectionUIC extends StatefulElement {
   
 
   modeStartAddSegment = function () {
-    this.layerSelector.lock();
+    console.log("Called modeStartAddSegment");
+    this.layerManager.lock(this);
     this.currentMode = new AddSegmentMode(this);
     this.mapManager.setMode(this.currentMode);
   };
@@ -787,7 +815,7 @@ export class ModeSelectionUIC extends StatefulElement {
   }
 
   modeConfirm = function () {     
-    confirmation = "Add new segment to the active layer?";
+    const confirmation = "Add new segment to the active layer?";
     this.dialogueBox.setState("confirming", {confirmation: confirmation}, null, null, this.modeConfirmed, null);
   }
 
@@ -799,12 +827,12 @@ export class ModeSelectionUIC extends StatefulElement {
     if(mode === this.currentMode) {
       this.currentMode = null;
     }
-    this.layerSelector.unlock();
+    this.layerManager.unlock(this);
     this.clear();     
   }
 
 
-  constructor(element, mapManager, messageBar, dialogueBox, extraControls, layerSelector, lock){
+  constructor(element, mapManager, messageBar, dialogueBox, extraControls, layerManager, interlock){
 
     super(element);
     
@@ -812,8 +840,8 @@ export class ModeSelectionUIC extends StatefulElement {
     this.messageBar = messageBar;
     this.dialogueBox = dialogueBox;
     this.extraControls = extraControls;
-    this.layerSelector = layerSelector;
-    this.lock = lock;
+    this.layerManager = layerManager;
+    this._interlock = interlock;
 
     // Bind(this) for the event handlers so that they can be used as such a know about 'this'
     this.testShowDialogue = this.testShowDialogue.bind(this); 
@@ -823,7 +851,7 @@ export class ModeSelectionUIC extends StatefulElement {
     this.flashMessageB = this.flashMessageB.bind(this);
     this.endTest = this.endTest.bind(this);
     this.modeStartAddSegment = this.modeStartAddSegment.bind(this);
-    this.modeCancel = this.modeCancel.bind(this);i
+    this.modeCancel = this.modeCancel.bind(this);
     this.modeUndo = this.modeUndo.bind(this);
     this.modeConfirm = this.modeConfirm.bind(this);
     this.modeConfirmed = this.modeConfirmed.bind(this);
@@ -839,7 +867,7 @@ export class ModeSelectionUIC extends StatefulElement {
       <button id="showDialogueBoxBtn">Show Dialogue Box</button>
       <button id="flashABtn">Flash A</button>
       <button id="flashBBtn">Flash B</button>
-      <button id="endTestBtn">Flash C</button>
+      <button id="endTestBtn">End Test</button>
     `);
 
     this.defineState("segment-selecting",`
@@ -856,7 +884,7 @@ export class ModeSelectionUIC extends StatefulElement {
       <button id="modeCancelBtn">Cancel</button>
     `);
 
-    this.defineState("segment-adding-confirm",`
+    this.defineState("segment-adding-c",`
       <button id="modeUndoBtn">Undo</button>
       <button id="modeCancelBtn">Cancel</button>
       <button id="modeConfirmBtn">Confirm</button>
@@ -868,7 +896,7 @@ export class ModeSelectionUIC extends StatefulElement {
 
     // SET THE DEFAULT STATE
 
-    this.defaultState = "segment_selecting"
+    this.defaultState = "segment-selecting"
 
     // DEFINE STATES FOR EXTRACONTROLS
     this.extraControls.defineState("testing-from-modeSelector",`
@@ -889,7 +917,7 @@ export class ModeSelectionUIC extends StatefulElement {
 
 
     // INITIATE IN DEFAULT STATE
-    this.setState("segment-selecting", null, null, null);
+    this.setState(this.defaultState, null, null, null);
 
   }
 
@@ -907,22 +935,22 @@ export class ModeSelectionUIC extends StatefulElement {
       break;
 
       case "segment-selecting":
-        this.element.querySelector("#addSegmentBtn").onclick = this.initiateAddSegment;
+        this.element.querySelector("#addSegmentBtn").onclick = this.modeStartAddSegment;
       break;
 
       case "segment-adding-a":
-        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel();
+        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel;
       break;
 
       case "segment-adding-b":
-        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel();
-        this.element.querySelector("#modeUndoBtn").onclick = this.modeUndo(); 
+        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel;
+        this.element.querySelector("#modeUndoBtn").onclick = this.modeUndo; 
       break;
 
-      case "segment-adding-confirm":
-        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel();
-        this.element.querySelector("#modeUndoBtn").onclick = this.modeUndo(); 
-        this.element.querySelector("#modeConfirmBtn").onclick = this.modeConfirm();  
+      case "segment-adding-c":
+        this.element.querySelector("#modeCancelBtn").onclick = this.modeCancel;
+        this.element.querySelector("#modeUndoBtn").onclick = this.modeUndo; 
+        this.element.querySelector("#modeConfirmBtn").onclick = this.modeConfirm;  
       break;
 
       default:
@@ -955,6 +983,24 @@ export class ModeSelectionUIC extends StatefulElement {
 
   }
   
+
+  lock(caller) {
+      this._interlock.lock(caller);
+  }
+
+
+  unlock(caller) {
+      this._interlock.unlock(caller);
+  }
+
+  isLocked() {
+      return this._interlock.isLocked();
+  }
+
+  isInterlocked() {
+      return this._interlock.isInterlocked();
+  }
+
   
 }
 
@@ -982,8 +1028,8 @@ export class MapManagerUIC {
     this.networkLayerStack = new NetworkLayerStack();
     this.mapUILayer = new MapUILayer();
 
-    //!! TEMPORARY - TO BE REPLACED WITH SERVER INTERACTION IN LayerSelectorUIC
-    this.networkLayerStack.addLayer(new NetworkLayer(1, "New Layer"));
+    //!! TEMPORARY - TO BE REPLACED WITH SERVER INTERACTION IN LayerManagerUIC
+    //this.networkLayerStack.addLayer(new NetworkLayer(1, "New Layer"));
 
   }
 
@@ -999,13 +1045,15 @@ export class MapManagerUIC {
 
   }
 
+//Generated by CoPilot and thought to be unexecutable and unused  
+/*
   refreshMap() {
     if (!this.map) {
       return;
     }
     this.map.clearLayers();
     this.map.renderMap();
-  }
+  }*/
 
   renderMap() {
     if (!this.map) {
@@ -1065,16 +1113,16 @@ export class MapManagerUIC {
 
 
 
-class LayerSelectorUIC {
+export class LayerManagerUIC {
 
-    constructor(element, messageBar, dialogueBox, extraControls, mapManager, lock, currentUser) {
+    constructor(element, messageBar, dialogueBox, extraControls, mapManager, interlock, getCurrentUserID) {
         this.element = element;
         this.messageBar = messageBar;
         this.dialogueBox = dialogueBox;
         this.extraControls = extraControls;
         this.mapManager = mapManager;
-        this.lock = lock;
-        this.currentUser = currentUser;
+        this._interlock = interlock;
+        this.getCurrentUserID = getCurrentUserID; //Note this is a function reference
   
 
         this.ownsTheExtraControlsState = false;
@@ -1092,31 +1140,48 @@ class LayerSelectorUIC {
         this._onClick = this._onClick.bind(this);
         this._onChange = this._onChange.bind(this); 
 
+        this.element.innerHTML = "<h3>Layers</h3>";
+
+        this.layerListElement = document.createElement("div");
+        this.layerListElement.className = "layer-list";
+        this.element.appendChild(this.layerListElement);``
+
+        this.manageLayersButton = document.createElement("button");
+        this.manageLayersButton.className = "manage-layers";
+        this.manageLayersButton.textContent = "Manage Layers";
+        this.element.appendChild(this.manageLayersButton);
+
+        this.manageSchemasButton = document.createElement("button");
+        this.manageSchemasButton.className = "manage-schemas";
+        this.manageSchemasButton.textContent = "Manage Schemas";
+        this.element.appendChild(this.manageSchemasButton);
+
+        this.manageLayersButton.addEventListener("click", this._openManageLayers.bind(this));
+        this.manageSchemasButton.addEventListener("click", this._openManageSchemas.bind(this));
+
         this.element.addEventListener("click", this._onClick);
         this.element.addEventListener("change", this._onChange);
     }
 
 
     init() {
+
         // TEMPORARY: until server integration exists
+        const currentUserID = this.getCurrentUserID();
+
         var schemaId = this.nextSchemaId++;
-        var schema = new RenderingSchema(schemaId, "New Layer", this.currentUser);
+        var schema = new RenderingSchema(schemaId, "New Layer", currentUserID);
         this.schemas[schemaId] = schema;
 
         var layerId = this.nextLayerId++;
-        var layer = new NetworkLayer(layerId, "New Layer", this.currentUser);
+        var layer = new NetworkLayer(layerId, "New Layer", currentUserID);
         layer.setRenderingSchema(schema);
 
         this.mapManager.networkLayerStack.addLayer(layer);
+        this.mapManager.networkLayerStack.setActiveLayer(layerId);
+        // END OF TEMPORARY CODE 
 
         this.render();
-        
-        this.layerListElement = this.element.querySelector(".layer-list");
-        this.manageLayersButton = this.element.querySelector(".manage-layers");
-        this.manageSchemasButton = this.element.querySelector(".manage-schemas");
-
-        this.manageLayersButton.addEventListener("click", this._openManageLayers.bind(this));
-        this.manageSchemasButton.addEventListener("click", this._openManageSchemas.bind(this));
 
     }
 
@@ -1124,7 +1189,7 @@ class LayerSelectorUIC {
     render() {
         this.layerListElement.innerHTML = "";
 
-        var layers = this.mapManager.networkLayerStack.getOrderedLayers();
+        var layers = this.mapManager.networkLayerStack.getOrderedLayers().reverse();
         var i, layer, row;
 
         for (i = 0; i < layers.length; i++) {
@@ -1133,7 +1198,7 @@ class LayerSelectorUIC {
             this.layerListElement.appendChild(row);
         }
 
-        if (this.lock.isInterlocked()) {
+        if (this.isInterlocked()) {
             this.element.classList.add("greyed-out");
         } else {
             this.element.classList.remove("greyed-out");
@@ -1164,8 +1229,9 @@ class LayerSelectorUIC {
         vis.className = "visibility-toggle";
         vis.checked = this.mapManager.networkLayerStack.isVisible(layer.id);
         row.appendChild(vis);
-
-        if (layer.isOwnedBy(this.currentUser)) {
+        
+        const currentUserID = this.getCurrentUserID();
+        if (layer.isOwnedBy(currentUserID)) {
             var nameInput = document.createElement("input");
             nameInput.className = "layer-name-input";
             nameInput.value = layer.getName();
@@ -1204,7 +1270,7 @@ class LayerSelectorUIC {
 
 
     _populateSchemaSelect(select, currentSchema) {
-        var ids = Object.keys(this.schemas);
+        var ids = Object.keys(this.schemas).reverse();
         var i, id, s, opt;
 
         for (i = 0; i < ids.length; i++) {
@@ -1221,8 +1287,7 @@ class LayerSelectorUIC {
 
 
     _onClick(e) {
-        if (this.lock.isInterlocked()) {
-            this.render();
+        if (this.isInterlocked()) {
             return;
         }
 
@@ -1257,11 +1322,6 @@ class LayerSelectorUIC {
 
 
     _onChange(e) {
-        if (this.lock.isInterlocked()) {
-            this.render();
-            return;
-        }
-
         var row = e.target.closest(".layer-row");
         var layerId, layer;
 
@@ -1270,17 +1330,29 @@ class LayerSelectorUIC {
             layer = this.mapManager.networkLayerStack.getLayer(layerId);
 
             if (e.target.classList.contains("visibility-toggle")) {
+                if (this.isInterlocked()) {
+                    e.target.checked = this.mapManager.networkLayerStack.isVisible(layerId);
+                    return;
+                }
                 this.mapManager.networkLayerStack.setVisible(layerId, e.target.checked);
                 return;
             }
             
             if (e.target.classList.contains("layer-name-input")) {
+                if (this.isInterlocked()) {
+                    e.target.value = layer.getName();
+                    return;
+                }
                 layer.setName(e.target.value);
                 this.render();
                 return;
             }
 
             if (e.target.classList.contains("schema-selector")) {
+                if (this.isInterlocked()) {
+                    e.target.value = layer.getRenderingSchema().id;
+                    return;
+                }
                 var schema = this.schemas[e.target.value];
                 layer.setRenderingSchema(schema);
                 return;
@@ -1290,14 +1362,12 @@ class LayerSelectorUIC {
 
 
     async _openManageLayers() {
-        await this.extraControls.close();
 
-        var ok = await this.extraControls.setCustomMode(this.onExtraStateChange);
-        if (!ok) return;
+        this.extraControls.close();
+        this.extraControls.setCustomMode(this.onExtraStateChange);
+        await this.extraControls.open();
 
         this.ownsTheExtraControlsState = true;
-
-        await this.extraControls.open();
 
         this.showRemoveButtons = true;
         this.render();
@@ -1362,7 +1432,8 @@ class LayerSelectorUIC {
         delBtn.textContent = "✖";
         row.appendChild(delBtn);
 
-        if (layer.isOwnedBy(this.currentUser)) {
+        const currentUserID = this.getCurrentUserID();
+        if (layer.isOwnedBy(currentUserID)) {
             var nameInput = document.createElement("input");
             nameInput.className = "layer-name-input";
             nameInput.value = layer.getName();
@@ -1406,7 +1477,7 @@ class LayerSelectorUIC {
         if (e.target.classList.contains("add-layer")) {
             var stack = this.mapManager.networkLayerStack;
             if (stack.getOrderedLayers().length >= this.maxLayers) {
-                this.dialogueBox.setState("notifying", {message: "You can only have up to three layers on the map at a time."});
+                this.dialogueBox.setState("notifying", {message: "You can only have up to three layers on the map at a time."}, null, null);
                 return;
             }
         
@@ -1419,14 +1490,14 @@ class LayerSelectorUIC {
         
         if (e.target.classList.contains("delete-layer")) {
             //add functionality for shared layers
-            this.dialogueBox.setState("confirming", {confirmation: "Delete this layer permanently?"}, onConfirm() => {
+            this.dialogueBox.setState("confirming", {confirmation: "Delete this layer permanently?"}, null, null, () => {
                 delete this.availableLayers[layerId];
 
                 // placeholder for server call
                 // server.deleteLayer(layerId);
 
                 this._refreshManageLayersDrawerIfOpen();
-            });
+            }, null);
             return;
         }
     }
@@ -1447,16 +1518,18 @@ class LayerSelectorUIC {
         if (stack.getOrderedLayers().length >= this.maxLayers) {
             this.dialogueBox.setState("notifying", {
                 message: "You can only have up to three layers on the map at a time."
-            });
+            }, null, null);
             return;
         }
 
+        const currentUserID = this.getCurrentUserID();
+
         var schemaId = this.nextSchemaId++;
-        var schema = new RenderingSchema(schemaId, "New Layer", this.currentUser);
+        var schema = new RenderingSchema(schemaId, "New Layer", currentUserID);
         this.schemas[schemaId] = schema;
 
         var layerId = this.nextLayerId++;
-        var layer = new NetworkLayer(layerId, "New Layer", this.currentUser);
+        var layer = new NetworkLayer(layerId, "New Layer", currentUserID);
         layer.setRenderingSchema(schema);
 
         stack.addLayer(layer);
@@ -1465,19 +1538,17 @@ class LayerSelectorUIC {
 
 
     _handleDoneLayers() {
+        this.extraControls.close()
         this.extraControls.clear();
     }
 
 
     async _openManageSchemas() {
-        await this.extraControls.close();
-
-        var ok = await this.extraControls.setCustomMode(this.onExtraStateChange);
-        if (!ok) return;
+        this.extraControls.close();
+        this.extraControls.setCustomMode(this.onExtraStateChange);
+        await this.extraControls.open();
 
         this.ownsTheExtraControlsState = true;
-
-        await this.extraControls.open();
 
         var container = this.extraControls.getElement();
 
@@ -1565,7 +1636,7 @@ class LayerSelectorUIC {
     _populateSchemaPicker(picker) {
         picker.innerHTML = "";
 
-        var ids = Object.keys(this.schemas);
+        var ids = Object.keys(this.schemas).reverse();
         var i, id, s, opt;
 
         for (i = 0; i < ids.length; i++) {
@@ -1603,7 +1674,7 @@ class LayerSelectorUIC {
 
     _handleNewSchema() {
         var schemaId = this.nextSchemaId++;
-        var schema = new RenderingSchema(schemaId, "New Schema", this.currentUser);
+        var schema = new RenderingSchema(schemaId, "New Schema", this.getCurrentUserID());
         this.schemas[schemaId] = schema;
 
         var picker = this.extraControls.getElement().querySelector(".schema-picker");
@@ -1615,6 +1686,7 @@ class LayerSelectorUIC {
 
 
     _handleDoneSchemas() {
+        this.extraControls.close();
         this.extraControls.clear();
     }
 
@@ -1623,11 +1695,22 @@ class LayerSelectorUIC {
         var picker = this.extraControls.getElement().querySelector(".schema-picker");
         var schemaId = picker.value;
 
-        this.dialogueBox.setState("confirming", {confirmation: "Delete this schema permanently?"}, onConfirm() => {
+        var layersUsing = this.mapManager.networkLayerStack.getOrderedLayers().filter(function(layer) {
+            var s = layer.getRenderingSchema();
+            return s && String(s.id) === String(schemaId);
+        });
+
+        if (layersUsing.length > 0) {
+            return this.dialogueBox.setState("notifying", {message: `Cannot delete schema; it is used by ${layersUsing.length} layer(s). Reassign layers first.`});
+        }
+
+        this.dialogueBox.setState("confirming", {confirmation: "Delete this schema permanently?"}, null, null, () => {
             delete this.schemas[schemaId];
 
             // placeholder for server call
             // server.deleteSchema(schemaId);
+
+            this.render(); // update layer list schema dropdowns
 
             this._populateSchemaPicker(picker);
 
@@ -1640,8 +1723,7 @@ class LayerSelectorUIC {
             picker.value = picker.options[0].value;
             this._loadSchemaIntoEditor(picker.value);
 
-            this.render(); // update layer list schema dropdowns
-        });
+        }, null);
     }
 
 
@@ -1691,7 +1773,7 @@ class LayerSelectorUIC {
 
 
     lock(caller) {
-        this.lock.lock(caller);
+        this._interlock.lock(caller);
         this.element.classList.add("greyed-out");
 
         if (this.ownsTheExtraControlsState) {
@@ -1701,12 +1783,15 @@ class LayerSelectorUIC {
 
 
     unlock(caller) {
-        this.lock.unlock(caller);
+        this._interlock.unlock(caller);
         this.element.classList.remove("greyed-out");
     }
 
+    isLocked() {
+        return this._interlock.isLocked();
+    }
 
     isInterlocked() {
-        return this.lock.isInterlocked();
+        return this._interlock.isInterlocked();
     }
 }

@@ -15,8 +15,8 @@ export class MapManagerMode {
     activate(mapManager) {
         this.mapManager = mapManager;
         this.map = mapManager.map;
-        this.UILayer = mapManager.UILayer;
-        this.stack = mapManager.networkStack;
+        this.UILayer = mapManager.mapUILayer;
+        this.stack = mapManager.networkLayerStack;
 
         this.activeLayer = this.stack.getActiveLayer();
 
@@ -38,6 +38,12 @@ export class MapManagerMode {
         this.map.off('keydown', this._onKey);
         this.map.off('wheel', this._onWheel);
 
+        //reset cursor appearance
+        if (this.map && this.map._container) {
+            this.map._container.style.cursor = '';
+        }
+
+
         // Clear temporary UI
         if (this.UILayer) {
             this.UILayer.clearAll();
@@ -52,7 +58,7 @@ export class MapManagerMode {
 
         // Signal end of workflow
         this.modeSelector.onModeEnded(this);
-    }i
+    }
 
     cancel() {
         this.mapManager.exitMode();
@@ -81,13 +87,28 @@ export class MapManagerMode {
 export class AddSegmentMode extends MapManagerMode {
 
     activate(mapManager) {
+            console.log("Called mode active");
+
         super.activate(mapManager);
+
+       if (!this.activeLayer) {
+            // No active layer: bail out cleanly
+            this.modeSelector.dialogueBox.setState(
+                "notifying",
+                { message: "No active layer selected. Select a layer before adding segments." }
+            );
+            this.mapManager.exitMode();
+            return;
+        }
 
         // Reset workflow state
         this.junctionA = null;
         this.junctionB = null;
 
-        this.modeSelector.setState('add-segment-a');
+        // Crosshair cursor for add-segment mode
+        this.map._container.style.cursor = 'crosshair';
+
+        this.modeSelector.setState('segment-adding-a');
     }
 
     deactivate() {
@@ -105,10 +126,10 @@ export class AddSegmentMode extends MapManagerMode {
         if (!this.junctionA) {
             this.junctionA = { lat, lng };
 
-            this.UILayer.setCrosshair(lat, lng);
+            this.UILayer.setCrosshairA(lat, lng);
             this.UILayer.startRubberband([lat, lng]);
 
-            this.modeSelector.setState('add-segment-b');
+            this.modeSelector.setState('segment-adding-b');
             return;
         }
 
@@ -117,8 +138,8 @@ export class AddSegmentMode extends MapManagerMode {
             this.junctionB = { lat, lng };
 
             this.UILayer.updateRubberband({ lat, lng });
-
-            this.modeSelector.setState('add-segment-confirm');
+            this.UILayer.setCrosshairB(lat, lng);
+            this.modeSelector.setState('segment-adding-c');
             return;
         }
     }
@@ -137,6 +158,10 @@ export class AddSegmentMode extends MapManagerMode {
         this.activeLayer.addSegment(j1, j2);
 
         // End the mode (MapManagerUIC will call deactivate)
+    }
+
+    confirm() {
+        this.confirmNewSegment();
         this.mapManager.exitMode();
     }
 
@@ -146,10 +171,10 @@ export class AddSegmentMode extends MapManagerMode {
             this.junctionB = null;
 
             this.UILayer.clearAll();
-            this.UILayer.setCrosshair(this.junctionA.lat, this.junctionA.lng);
+            this.UILayer.setCrosshairA(this.junctionA.lat, this.junctionA.lng);
             this.UILayer.startRubberband([this.junctionA.lat, this.junctionA.lng]);
 
-            this.modeSelector.setState('add-segment-b');
+            this.modeSelector.setState('segment-adding-b');
             return;
         }
 
@@ -158,7 +183,7 @@ export class AddSegmentMode extends MapManagerMode {
             this.junctionA = null;
 
             this.UILayer.clearAll();
-            this.modeSelector.setState('add-segment-a');
+            this.modeSelector.setState('segment-adding-a');
             return;
         }
     }

@@ -35,8 +35,9 @@ export class StatefulElement{
   }
 
   setState(name, params = {}, afterAfterRender, onStateChange) {
-  
-    this.onStateChange();
+    if(this.onStateChange){
+      this.onStateChange();
+    }
     this.onStateChange = onStateChange;
   
     if (!this.states.hasOwnProperty(name)) {
@@ -88,7 +89,7 @@ export class StatefulElement{
     
     if (afterAfterRender) {
       try {
-        afterAfterRender(state);
+        afterAfterRender(name);
       } catch (err) {
         // swallow to avoid deadlock; caller can log if needed
       }
@@ -107,7 +108,9 @@ export class StatefulElement{
   
   clear() {
   
-    this.onStateChange();
+    if(this.onStateChange){
+      this.onStateChange();
+    }
     this.onStateChange = null;
   
     this.element.innerHTML = ""; 

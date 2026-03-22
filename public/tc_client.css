@@ -21,6 +21,7 @@ body {
 #message-bar {
     height: 60px;
     width: 100%;
+  box-sizing: border-box;
     background: #ddd;
     border-bottom: 1px solid #ccc;
 
@@ -63,6 +64,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1em; /* space between sections */
+  box-sizing: border-box;
 }
 
 
@@ -95,6 +97,7 @@ body {
       padding: 1em;
       transform: translateX(0);
       transition: transform 0.3s ease;
+      box-sizing: border-box;
     }
 
     #extra-controls.shown {
@@ -157,6 +160,15 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2px;
+}
+
+.move-buttons .move-up,
+.move-buttons .move-down {
+    padding: 0 4px !important;
+    margin: 0 !important;
+    height: 12px !important;
+    line-height: 1 !important;
+    font-size: 10px !important;
 }
 
 .layer-selector-controls {

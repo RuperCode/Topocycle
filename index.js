@@ -197,7 +197,7 @@ app.post('/api/logout', function(req, res) {
     if (err) {
       return res.status(500).send('Error logging out');
     }
-    res.clearCookie('cm_session'); // name of your session cookie
+    res.clearCookie('topocycle_session'); // name of your session cookie
     res.json({ success: true });
   });
 });
